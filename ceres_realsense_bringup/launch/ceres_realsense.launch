@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<launch>
+  ### Use sensor:=tim or sensor:=mrs1000, depending on which sensor is connected
+  ### Roboter Setup
+  <arg name="use_volksbot_driver" default="true" />
+  <arg name="use_imu" default="true" />
+  <arg name="sensor" default="tim"/>
+  <arg name="use_ekf" default="true" />
+  <arg name="jsp_gui" default="false"/>
+
+  ### Upload Pluto to parameter server
+  <include file="$(find ceres_description)/launch/upload_ceres_realsense.launch"/>      	
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher" />
+  <!-- Joint State Publisher -->
+  <node pkg="joint_state_publisher" type="joint_state_publisher" name="joint_state_publisher">
+  </node>
+
+  ### Sensors
+  <include if="$(arg use_volksbot_driver)" file="$(find ceres_bringup)/launch/volksbot.launch"/>
+  <include file="$(find ceres_bringup)/launch/sick_$(arg sensor).launch"/> 
+  <include if="$(arg use_imu)" file="$(find ceres_bringup)/launch/imu_single_nodes.launch"/>
+
+</launch>
