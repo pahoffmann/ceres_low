@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(my_pcl_tutorial)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++14)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -16,7 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-
+find_package(PCL 1.8 REQUIRED COMPONENTS common)
+include_directories(${PCL_INCLUDE_DIRS})
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -204,3 +205,9 @@ target_link_libraries(example ${catkin_LIBRARIES})
 
 add_executable(filterpipeline src/filterpipeline.cpp)
 target_link_libraries(filterpipeline ${catkin_LIBRARIES})
+
+add_executable(segmentation src/segmentation.cpp)
+target_link_libraries(segmentation ${catkin_LIBRARIES})
+
+add_executable(planar src/planar_extraction.cpp)
+target_link_libraries(planar ${catkin_LIBRARIES})

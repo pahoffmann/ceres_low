@@ -1,0 +1,2 @@
+- setup-file:
+    local-name: /home/hiep/catkin_ws/src/ceres_low/my_pcl_tutorial/cmake-build-debug/devel/setup.sh

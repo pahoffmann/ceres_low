@@ -1,0 +1,8 @@
+prefix=/home/hiep/catkin_ws/src/ceres_low/my_pcl_tutorial/cmake-build-debug/devel
+
+Name: my_pcl_tutorial
+Description: Description of my_pcl_tutorial
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/hiep/catkin_ws/src/ceres_low/my_pcl_tutorial/cmake-build-debug/devel/lib 
+Requires: 
