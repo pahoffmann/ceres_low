@@ -95,6 +95,28 @@ protected:
 };
 
 
+double MedianCalc(std::vector<double> koord)
+{
+    size_t size = koord.size();
+
+    if (size == 0)
+    {
+        return 0;  // Undefined, really.
+    }
+    else
+    {
+        sort(koord.begin(), koord.end());
+        if (size % 2 == 0)
+        {
+            return (koord[size / 2 - 1] + koord[size / 2]) / 2;
+        }
+        else
+        {
+            return koord[size / 2];
+        }
+    }
+}
+
 void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
 {
     //Convert sensor_msgs to pcl::pointcloud<t>
@@ -139,176 +161,36 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     removal_filter.setInputCloud (filtered_cloud);
     removal_filter.filter (*point_cloudPtr);
 
-    /*
-    //Plane model segmentation
-    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
-    pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
-    // Create the segmentation object
-    pcl::SACSegmentation<pcl::PointXYZRGB> seg;
-    // Optional
-    seg.setOptimizeCoefficients (true);
-    // Mandatory
-    seg.setModelType (pcl::SACMODEL_PLANE);
-    seg.setMethodType (pcl::SAC_RANSAC);
-    seg.setMaxIterations (1000);
-    seg.setDistanceThreshold (0.01);
+    std::vector<double> x_koord;
+    std::vector<double> y_koord;
 
-    // Create the filtering object
-    pcl::ExtractIndices<pcl::PointXYZRGB> extract;
-
-    int i = 0, nr_points = (int) filtered_cloud->points.size ();
-    // While 30% of the original cloud is still there
-    while (filtered_cloud->points.size () > 0.3 * nr_points)
+    for (int i = 0; i < point_cloudPtr->points.size (); i++)
     {
-        // Segment the largest planar component from the remaining cloud
-        seg.setInputCloud (filtered_cloud);
-        seg.segment (*inliers, *coefficients);
-        if (inliers->indices.size () == 0)
-        {
-            std::cerr << "Could not estimate a planar model for the given dataset." << std::endl;
-            break;
-        }
-
-        // Extract the inliers
-        extract.setInputCloud (filtered_cloud);
-        extract.setIndices (inliers);
-        extract.setNegative (false);
-        extract.filter (*cloud_p);
-        //std::cerr << "PointCloud representing the planar component: " << cloud_p->width * cloud_p->height << " data points." << std::endl;
-
-
-        // Create the filtering object
-        extract.setNegative (true);
-        extract.filter (*cloud_f);
-        filtered_cloud.swap (cloud_f);
-        i++;
+        x_koord.push_back(point_cloudPtr->points[i].x);
+        y_koord.push_back(point_cloudPtr->points[i].y);
     }
 
+    double x_median= MedianCalc(x_koord);
+    double y_median= MedianCalc(y_koord);
+
+    // Fill in the cloud data
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr final_koord(new pcl::PointCloud<pcl::PointXYZRGB>);
+    final_koord->width  = 1;
+    final_koord->height = 1;
+    final_koord->points.resize (cloud->width * cloud->height);
+
+    // Generate the data
+
+    final_koord->points[0].x = x_median;
+    final_koord->points[0].y = y_median;
+    final_koord->points[0].z = 0.0;
 
 
-    //Object segmentation
-    // Creating the KdTree object for the search method of the extraction
-    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGB>);
-    tree->setInputCloud(filtered_cloud);
 
-    std::vector<pcl::PointIndices> cluster_indices;
-    pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
-    ec.setClusterTolerance(0.008);
-    ec.setMinClusterSize(50); //100
-    ec.setMaxClusterSize(1000);//99000000
-    ec.setSearchMethod(tree);
-    ec.setInputCloud(filtered_cloud);
-    ec.extract(cluster_indices);
-
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloud_segmented(new pcl::PointCloud<pcl::PointXYZRGB>);
-
-    int j= 0;
-
-     //iteriere über jeden cluster
-    for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
-    {
-        for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
-        {
-            pcl::PointXYZRGB point;
-            point.x = filtered_cloud->points[*pit].x;
-            point.y = filtered_cloud->points[*pit].y;
-            point.z = filtered_cloud->points[*pit].z;
-
-            if (j == 0) //Red	#FF0000	(255,0,0)
-            {
-                point.r = 0;
-                point.g = 0;
-                point.b = 255;
-            }
-            else if (j == 1) //Lime	#00FF00	(0,255,0)
-            {
-                point.r = 0;
-                point.g = 255;
-                point.b = 0;
-            }
-            else if (j == 2) // Blue	#0000FF	(0,0,255)
-            {
-                point.r = 255;
-                point.g = 0;
-                point.b = 0;
-            }
-            else if (j == 3) // Yellow	#FFFF00	(255,255,0)
-            {
-                point.r = 255;
-                point.g = 255;
-                point.b = 0;
-            }
-            else if (j == 4) //Cyan	#00FFFF	(0,255,255)
-            {
-                point.r = 0;
-                point.g = 255;
-                point.b = 255;
-            }
-            else if (j == 5) // Magenta	#FF00FF	(255,0,255)
-            {
-                point.r = 255;
-                point.g = 0;
-                point.b = 255;
-            }
-            else if (j == 6) // Olive	#808000	(128,128,0)
-            {
-                point.r = 128;
-                point.g = 128;
-                point.b = 0;
-            }
-            else if (j == 7) // Teal	#008080	(0,128,128)
-            {
-                point.r = 0;
-                point.g = 128;
-                point.b = 128;
-            }
-            else if (j == 8) // Purple	#800080	(128,0,128)
-            {
-                point.r = 128;
-                point.g = 0;
-                point.b = 128;
-            }
-            else
-            {
-                if (j % 2 == 0)
-                {
-                    point.r = 255 * j / (cluster_indices.size());
-                    point.g = 128;
-                    point.b = 50;
-                }
-                else
-                {
-                    point.r = 0;
-                    point.g = 255 * j / (cluster_indices.size());
-                    point.b = 128;
-                }
-            }
-            point_cloud_segmented->push_back(point);
-
-        }
-        j++;
-    }
-    std::cerr<< "segemnted:  " << (int)point_cloud_segmented->size() << "\n";
-    std::cerr<< "origin:     " << (int)filtered_cloud->size() << "\n";
-    // Convert to ROS data type
-    point_cloud_segmented->header.frame_id = point_cloudPtr->header.frame_id;
-    if(point_cloud_segmented->size()) pcl::toPCLPointCloud2(*point_cloud_segmented, cloud_filtered);
-    else pcl::toPCLPointCloud2(*filtered_cloud, cloud_filtered);
     sensor_msgs::PointCloud2 output;
-    pcl_conversions::fromPCL(cloud_filtered, output);
+    pcl::toROSMsg (*final_koord, output);
 
-    // Publish the data
     pub.publish (output);
-     */
-
-
-
-
-
-  sensor_msgs::PointCloud2 output;
-  pcl::toROSMsg (*point_cloudPtr, output);
-
-  pub.publish (output);
 }
 
 int main (int argc, char** argv)
