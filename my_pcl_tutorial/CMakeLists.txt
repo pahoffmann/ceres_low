@@ -16,7 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(PCL 1.8 REQUIRED COMPONENTS common)
+#find_package(PCL 1.8 REQUIRED COMPONENTS common)
+find_package(PCL 1.7 REQUIRED COMPONENTS common)
 include_directories(${PCL_INCLUDE_DIRS})
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -199,15 +200,18 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
-
+#
 add_executable(example src/example.cpp)
 target_link_libraries(example ${catkin_LIBRARIES})
 
 add_executable(filterpipeline src/filterpipeline.cpp)
 target_link_libraries(filterpipeline ${catkin_LIBRARIES})
 
-add_executable(segmentation src/segmentation.cpp)
-target_link_libraries(segmentation ${catkin_LIBRARIES})
+#add_executable(segmentation src/segmentation.cpp)
+#target_link_libraries(segmentation ${catkin_LIBRARIES})
 
-add_executable(planar src/planar_extraction.cpp)
-target_link_libraries(planar ${catkin_LIBRARIES})
+#add_executable(planar src/planar_extraction.cpp)
+#target_link_libraries(planar ${catkin_LIBRARIES})
+
+add_executable(regiongrowing src/region_growing.cpp)
+target_link_libraries(regiongrowing ${catkin_LIBRARIES})

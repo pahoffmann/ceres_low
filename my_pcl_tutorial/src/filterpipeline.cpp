@@ -26,10 +26,74 @@
 #include <pcl/features/normal_3d.h>
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/filters/passthrough.h>
+#include <pcl/segmentation/region_growing_rgb.h>
 
 
 
 ros::Publisher pub;
+
+template <typename PointT>
+class ConditionThresholdHSV : public pcl::ConditionBase<PointT>
+{
+public:
+    typedef typename boost::shared_ptr<ConditionThresholdHSV<PointT> > Ptr;
+
+    ConditionThresholdHSV (float min_h, float max_h, float min_s, float max_s, float min_v, float max_v) :
+            min_h_(min_h), max_h_(max_h), min_s_(min_s), max_s_(max_s), min_v_(min_v), max_v_(max_v)
+    {
+        // Make min_h_ and max_h_ fall within [0, 360)
+        assert (!std::isnan(min_h) && !std::isnan(max_h));
+        while (min_h_ < 0) min_h_ += 360;
+        while (min_h_ >= 360) min_h_ -= 360;
+        while (max_h_ < 0) max_h_ += 360;
+        while (max_h_ >= 360) max_h_ -= 360;
+    }
+
+    // Evaluate whether the color of the given point falls within the specified thresholds
+    virtual bool evaluate(const PointT & p) const
+    {
+        float h, s, v;
+        rgb2hsv (p.r, p.g, p.b, h, s, v);
+        return (!std::isnan(h) && !std::isnan(s) && !std::isnan(v) &&
+                ((min_h_ < max_h_) ? ((min_h_ <= h) && (h <= max_h_)) : ((min_h_ <= h) || (h <= max_h_))) &&
+                (min_s_ <= s) && (s <= max_s_) &&
+                (min_v_ <= v) && (v <= max_v_));
+    }
+
+    void rgb2hsv (uint8_t r, uint8_t g, uint8_t b, float & h, float & s, float & v) const
+    {
+        float maxval = (r > g) ? ((r > b) ? r : b) : ((g > b) ? g : b);
+        float minval = (r < g) ? ((r < b) ? r : b) : ((g < b) ? g : b);
+        float minmaxdiff = maxval - minval;
+
+        if (maxval == minval)
+        {
+            h = 0;
+            s = 0;
+            v = maxval;
+            return;
+        }
+        else if (maxval == r)
+        {
+            h = 60.0*((g - b)/minmaxdiff);
+            if (h < 0) h += 360.0;
+        }
+        else if (maxval == g)
+        {
+            h = 60.0*((b - r)/minmaxdiff + 2.0);
+        }
+        else // (maxval == b)
+        {
+            h = 60.0*((r - g)/minmaxdiff + 4.0);
+        }
+        s = 100.0 * minmaxdiff / maxval;
+        v = maxval;
+    }
+
+protected:
+    float min_h_, max_h_, min_s_, max_s_, min_v_, max_v_;
+};
+
 
 void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
 {
@@ -46,7 +110,7 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     // Create the filtering object: downsample the dataset using a leaf size of 1cm
     pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
     sor.setInputCloud (cloudPtr);
-    sor.setLeafSize (0.01, 0.01, 0.01);
+    sor.setLeafSize (0.007, 0.007, 0.007);
     sor.filter (cloud_filtered);
 
 
@@ -64,10 +128,18 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     pass.setFilterLimits (0.0, 1.0);
     //pass.setFilterLimitsNegative (true);
     pass.filter (*filtered_cloud);
-
     pcl::copyPointCloud(*filtered_cloud, *point_cloudPtr);
 
+    //colorfilter
+    pcl::ConditionalRemoval<pcl::PointXYZRGB> removal_filter;
+    removal_filter.setKeepOrganized (false);
+    ConditionThresholdHSV<pcl::PointXYZRGB>::Ptr condition (new ConditionThresholdHSV<pcl::PointXYZRGB> (-20,20, 75,100, 25,255));
+    removal_filter.setCondition (condition);
 
+    removal_filter.setInputCloud (filtered_cloud);
+    removal_filter.filter (*point_cloudPtr);
+
+    /*
     //Plane model segmentation
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
@@ -113,7 +185,7 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     }
 
 
-    /*
+
     //Object segmentation
     // Creating the KdTree object for the search method of the extraction
     pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGB>);
@@ -121,9 +193,9 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
 
     std::vector<pcl::PointIndices> cluster_indices;
     pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
-    ec.setClusterTolerance(0.04);
-    ec.setMinClusterSize(100); //100
-    ec.setMaxClusterSize(25000);//99000000
+    ec.setClusterTolerance(0.008);
+    ec.setMinClusterSize(50); //100
+    ec.setMaxClusterSize(1000);//99000000
     ec.setSearchMethod(tree);
     ec.setInputCloud(filtered_cloud);
     ec.extract(cluster_indices);
@@ -132,6 +204,7 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
 
     int j= 0;
 
+     //iteriere über jeden cluster
     for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
     {
         for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
@@ -231,11 +304,11 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
 
 
 
+
   sensor_msgs::PointCloud2 output;
-  pcl::toROSMsg (*filtered_cloud, output);
+  pcl::toROSMsg (*point_cloudPtr, output);
 
   pub.publish (output);
-
 }
 
 int main (int argc, char** argv)
