@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(my_pcl_tutorial)
+project(reactive_navigation)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++14)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -12,11 +12,15 @@ find_package(catkin REQUIRED COMPONENTS
   pcl_ros
   roscpp
   sensor_msgs
+  cv_bridge
+  image_transport
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-
+find_package(PCL 1.8 REQUIRED COMPONENTS common)
+find_package(OpenCV 3 REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -105,7 +109,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES my_pcl_tutorial
+#  LIBRARIES reactive_navigation
 #  CATKIN_DEPENDS pcl_conversations pcl_ros roscpp sensor_msgs
 #  DEPENDS system_lib
 )
@@ -123,7 +127,7 @@ include_directories(
 
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/my_pcl_tutorial.cpp
+#   src/${PROJECT_NAME}/reactive_navigation.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -134,7 +138,7 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-# add_executable(${PROJECT_NAME}_node src/my_pcl_tutorial_node.cpp)
+# add_executable(${PROJECT_NAME}_node src/reactive_navigation_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -191,7 +195,7 @@ include_directories(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_my_pcl_tutorial.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_reactive_navigation.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
@@ -199,8 +203,10 @@ include_directories(
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
-add_executable(example src/example.cpp)
-target_link_libraries(example ${catkin_LIBRARIES})
+add_executable(imgBroadcast src/imgBroadcast.cpp)
+target_link_libraries(imgBroadcast ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
-add_executable(filterpipeline src/filterpipeline.cpp)
-target_link_libraries(filterpipeline ${catkin_LIBRARIES})
+
+add_executable(imgSubscriber src/imgSubscriber.cpp)
+target_link_libraries(imgSubscriber ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+
