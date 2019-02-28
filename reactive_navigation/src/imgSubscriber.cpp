@@ -8,119 +8,109 @@
 #include <stdlib.h>
 
 
-/**
- * This program picks up  an image broadcasted by 'imgBroadcast.cpp'
- * and applies canny edge detection to that image. 
- *
- * The user can manually set the lower threshold for the canny edge detector
- * by using a trackbar
- *
- * If applied the canny detector generates a mask
- * (bright lines representing the edges on a black background)
- */
-using namespace cv;
-using namespace std;
 
-// Global Variables
+int minLineLength = 175;
+int maxLineGap = 100;
 
-Mat src, src_gray, bgr;
-Mat dst, cdst, detected_edges;
-Mat Bands[3],merged;
-
-int lowThreshold = 50;
-int ratio = 3;
-int kernel_size = 3;
-int minLineLength = 125;
-int maxLineGap = 5;
-
-
-
-/**
- *	@function CannyThreshold
- *  @brief Trackbar callback - Canny thresholds input with a ratio 1:3
- */
-
-/*
-void CannyThreshold(int, void*)
-{
-	// Reduce noise with a kernel 3x3
-	blur(src_gray, detected_edges, cv::Size(3,3));
-
-	// Canny detector
-	Canny(detected_edges, detected_edges, lowThreshold, lowThreshold*ratio, kernel_size);
-
-	// Using Canny's output as a mask, we display the result
-	dst = Scalar::all(0);
-
-	// Copy source image to dst image
-	src.copyTo(dst, detected_edges);
-
-
-	//Show the image
-	imshow("Edge Map", dst);
-  	waitKey(30);
-
-}
-
-*/
 
 void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
 
-  // Load image
-  src = cv_bridge::toCvShare(msg, "bgr8")->image;
 
-  split(src, Bands);
-  vector<Mat> channels = {Bands[0], 3*Bands[1]-Bands[0]-Bands[2], Bands[2]};
-  merge(channels, merged);
-
+    double x;
+    double y;
+	double length;
+	double angle;
 
 
-  
+    cv::Mat srcImage = cv_bridge::toCvShare(msg, "bgr8")->image;
 
-  // Create a matrix of the same type and size as the image (for dst)
-  //dst.create(src.size(), src.type());
+    // convert to HSV color space
+    cv::Mat hsvImage;
+    cv::cvtColor(srcImage, hsvImage, CV_BGR2HSV);
 
-  //Use Canny Edge Detection on source image
-  Canny(src, dst, lowThreshold, lowThreshold*ratio, kernel_size);
+    // split the channels
+    std::vector<cv::Mat> hsvChannels;
+    cv::split(hsvImage, hsvChannels);
 
+    // hue channels tells you the color tone, if saturation and value aren't too low.
 
-  // Create colour image from gray image for hough transform
-  cvtColor(dst, cdst, CV_GRAY2BGR);
+    int hueValue = 50; // green color
+    int hueRange = 15; // how much difference from the desired color we want to include to the result If you increase this value, for example a red color would detect some orange values, too.
 
-/**
- * HOUGH TRANFORMATION
- * 
- * @function HoughLinesP() returns an array of (rho, theta)
- * @val rho is measured in pixels
- * @val theta is measures in radians
- *
- * HoughlinesP(inputImage as binary image(use canny edge detection to create binary),
- *				rho accuracy,
- *				theta accuracy,
- *				threshold: minimum accuracy an element needs to be considered a line),
- *				minLineLength: elements shorter than this are rejected
- *				maxLineGap: maximum allowed gap between line segments to treat them as a single line
- *
- */
+    int minSaturation = 50;
+    int minValue = 50; 
+
+	// [hue, saturation, value]
+    cv::Mat hueImage = hsvChannels[0]; 
+
+    // is the color within the lower hue range?
+    cv::Mat hueMask;
+    cv::inRange(hueImage, hueValue - hueRange, hueValue + hueRange, hueMask);
 
 
-	vector<Vec4i> lines;
-	HoughLinesP(dst, lines, 1, CV_PI/180, 80, minLineLength, maxLineGap);
-	for(size_t i = 0; i < lines.size(); i++)
-	{
-		cv::Vec4i l = lines[i];
-		line(cdst, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), kernel_size, CV_AA);
-	}
 
-	imshow("Source Image", src);
-	imshow("Detected Lines", cdst);
-	imshow("Merged", merged);
+    // if desired color is near the border of the hue space, check the other side too:
+    /*if (hueValue - hueRange < 0 || hueValue + hueRange > 180)
+    {
+        cv::Mat hueMaskUpper;
+        int upperHueValue = hueValue + 180; // in reality this would be + 360 instead
+        cv::inRange(hueImage, upperHueValue - hueRange, upperHueValue + hueRange, hueMaskUpper);
 
-	waitKey(30);
+        // add this mask to the other one
+        hueMask = hueMask | hueMaskUpper;
+    }
+	*/
+
+    // filter out all the pixels where saturation and value do not fit the limits:
+    cv::Mat saturationMask = hsvChannels[1] > minSaturation;
+    cv::Mat valueMask = hsvChannels[2] > minValue;
+
+    hueMask = (hueMask & saturationMask) & valueMask;
+
+    cv::imshow("Desired Color Only", hueMask);
+
+    // perform the line detection
+    std::vector<cv::Vec4i> lines;
+    cv::HoughLinesP(hueMask, lines, 1, CV_PI / 360, 50, minLineLength, maxLineGap);
+
+    // draw the result as big green lines:
+    for (unsigned int i = 0; i < lines.size(); ++i)
+    {
+    	cv::Vec4i line = lines[i];
+
+
+    	//line vector components
+   		x = line[2] - line[0];
+    	y = line[3] - line[1];
+
+    	cv::Vec2d v1(line[0], line[1]);
+    	cv::Vec2d v2(line[2], line[3]);
+    	cv::Vec2d baseVec(1, 0);
+    	cv::Vec2d res = v2 - v1;
+
+    	if(res[1] > 0) {
+    		res = res * -1;
+    	}
+
+    	double dotP = res.dot(baseVec);
+
+    	double angle = std::acos(dotP / cv::norm(res)) * (180/3.141592);
+
+        if(angle > 90){
+        	angle = 180 - angle;
+        }
+
+   		if(angle > 20 && angle < 60)
+    	{
+    		cv::line(srcImage, cv::Point(lines[i][0], lines[i][1]), cv::Point(lines[i][2], lines[i][3]), cv::Scalar(0, 255, 0), 5);	
+    	}      
+    }
+
+
+    cv::imshow("Source Image", srcImage);
+    cv::waitKey(30);
 }
-
-
 
 
 
@@ -129,10 +119,12 @@ int main(int argc, char **argv)
   ros::init(argc, argv, "image_listener");
   ros::NodeHandle nh;
 
+
   image_transport::ImageTransport it(nh);
-  image_transport::Subscriber sub = it.subscribe("camera/image", 1, imageCallback);
+  image_transport::Subscriber sub = it.subscribe("camera/color/image_raw", 1, imageCallback);
 
   ros::spin();
 
+  return 0;
 
 }
