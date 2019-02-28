@@ -32,6 +32,8 @@
 
 ros::Publisher pub;
 
+
+//Class
 template <typename PointT>
 class ConditionThresholdHSV : public pcl::ConditionBase<PointT>
 {
@@ -161,6 +163,7 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     removal_filter.setInputCloud (filtered_cloud);
     removal_filter.filter (*point_cloudPtr);
 
+    /*
     std::vector<double> x_koord;
     std::vector<double> y_koord;
 
@@ -177,18 +180,26 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr final_koord(new pcl::PointCloud<pcl::PointXYZRGB>);
     final_koord->width  = 1;
     final_koord->height = 1;
-    final_koord->points.resize (cloud->width * cloud->height);
+    final_koord->points.resize (final_koord->width * final_koord->height);
 
     // Generate the data
 
     final_koord->points[0].x = x_median;
     final_koord->points[0].y = y_median;
     final_koord->points[0].z = 0.0;
+    final_koord->points[0].r = 255;
+    final_koord->points[0].g = 0;
+    final_koord->points[0].b = 0;
+
+    std::cout<<final_koord->points[0].x<<std::endl;
+    std::cout<<final_koord->points[0].y<<std::endl;
+
+    */
 
 
 
     sensor_msgs::PointCloud2 output;
-    pcl::toROSMsg (*final_koord, output);
+    pcl::toROSMsg (*point_cloudPtr, output);
 
     pub.publish (output);
 }
