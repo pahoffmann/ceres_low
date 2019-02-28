@@ -9,12 +9,54 @@
 
 
 
+
+
+
+
+/*
+
+class myLitClass
+{
+	public:
+		cv::Mat rgbImage;
+		cv::Mat irImage;
+
+		myLitClass(){
+
+		}
+
+		void imageCallback(const sensor_msgs::ImageConstPtr& msg){
+			 rgbImage = cv_bridge::toCvShare(msg, "bgr8")->image;
+			 cv::imshow("Infrared", rgbImage);
+		}
+		void infraCallback(const sensor_msgs::ImageConstPtr& msg){
+			irImage = cv_bridge::toCvShare(msg, "8UC1")->image;
+ 			cv::imshow("Infrared", irImage);
+		}
+
+		cv::Mat getInfraMat(){
+			return irImage;
+		}
+
+		cv::Mat getRGBImage(){
+			return rgbImage;
+		}
+};
+
+*/
+
+cv::Mat srcImage;
+cv::Mat irImage;
 int minLineLength = 175;
 int maxLineGap = 100;
 
 
+
 void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
+
+
+    srcImage = cv_bridge::toCvShare(msg, "bgr8")->image;
 
 
     double x;
@@ -23,8 +65,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 	double angle;
 
 
-    cv::Mat srcImage = cv_bridge::toCvShare(msg, "bgr8")->image;
 
+/*
     // convert to HSV color space
     cv::Mat hsvImage;
     cv::cvtColor(srcImage, hsvImage, CV_BGR2HSV);
@@ -63,12 +105,12 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 	*/
 
     // filter out all the pixels where saturation and value do not fit the limits:
-    cv::Mat saturationMask = hsvChannels[1] > minSaturation;
+   /* cv::Mat saturationMask = hsvChannels[1] > minSaturation;
     cv::Mat valueMask = hsvChannels[2] > minValue;
 
     hueMask = (hueMask & saturationMask) & valueMask;
 
-    cv::imshow("Desired Color Only", hueMask);
+    //cv::imshow("Desired Color Only", hueMask);
 
     // perform the line detection
     std::vector<cv::Vec4i> lines;
@@ -105,26 +147,48 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     	{
     		cv::line(srcImage, cv::Point(lines[i][0], lines[i][1]), cv::Point(lines[i][2], lines[i][3]), cv::Scalar(0, 255, 0), 5);	
     	}      
-    }
+    }*/
 
 
-    cv::imshow("Source Image", srcImage);
+
     cv::waitKey(30);
+}
+
+
+void infraCallback(const sensor_msgs::ImageConstPtr& msg){
+	irImage = cv_bridge::toCvShare(msg, "8UC1")->image;
+
+	cv::Mat bgrChannel[3];
+	cv::split(srcImage, bgrChannel);
+
+	cv::Mat ndviImage = (irImage - bgrChannel[2]) / (irImage + bgrChannel[2]);
+
+	if(!irImage.empty() && !srcImage.empty()){
+		cv::imshow("Infrared", irImage);
+    	cv::imshow("Source Image", srcImage);
+    	cv::imshow("NDVI", ndviImage);
+  	}
+
 }
 
 
 
 int main(int argc, char **argv)
-{
+{  
   ros::init(argc, argv, "image_listener");
   ros::NodeHandle nh;
 
 
   image_transport::ImageTransport it(nh);
+
   image_transport::Subscriber sub = it.subscribe("camera/color/image_raw", 1, imageCallback);
+  image_transport::Subscriber sub2 = it.subscribe("camera/infra1/image_rect_raw", 1, infraCallback);
+
+
 
   ros::spin();
 
-  return 0;
+
+return 0;
 
 }
