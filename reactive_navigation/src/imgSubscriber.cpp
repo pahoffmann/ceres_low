@@ -66,8 +66,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 
 
-/*
-    // convert to HSV color space
+// convert to HSV color space
     cv::Mat hsvImage;
     cv::cvtColor(srcImage, hsvImage, CV_BGR2HSV);
 
@@ -83,7 +82,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     int minSaturation = 50;
     int minValue = 50; 
 
-	// [hue, saturation, value]
+    // [hue, saturation, value]
     cv::Mat hueImage = hsvChannels[0]; 
 
     // is the color within the lower hue range?
@@ -102,56 +101,89 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
         // add this mask to the other one
         hueMask = hueMask | hueMaskUpper;
     }
-	*/
+    */
 
     // filter out all the pixels where saturation and value do not fit the limits:
-   /* cv::Mat saturationMask = hsvChannels[1] > minSaturation;
+    cv::Mat saturationMask = hsvChannels[1] > minSaturation;
     cv::Mat valueMask = hsvChannels[2] > minValue;
 
     hueMask = (hueMask & saturationMask) & valueMask;
 
-    //cv::imshow("Desired Color Only", hueMask);
+    cv::imshow("Desired Color Only", hueMask);
 
     // perform the line detection
     std::vector<cv::Vec4i> lines;
     cv::HoughLinesP(hueMask, lines, 1, CV_PI / 360, 50, minLineLength, maxLineGap);
 
+    std::vector<cv::Vec4i> leftLines;
+    std::vector<cv::Vec4i> rightLines;
+
     // draw the result as big green lines:
     for (unsigned int i = 0; i < lines.size(); ++i)
     {
-    	cv::Vec4i line = lines[i];
+        cv::Vec4i line = lines[i];
 
 
-    	//line vector components
-   		x = line[2] - line[0];
-    	y = line[3] - line[1];
+        cv::Vec2d v1(line[0], line[1]);
+        cv::Vec2d v2(line[2], line[3]);
+        cv::Vec2d baseVec(1, 0);
+        cv::Vec2d res = v2 - v1;
 
-    	cv::Vec2d v1(line[0], line[1]);
-    	cv::Vec2d v2(line[2], line[3]);
-    	cv::Vec2d baseVec(1, 0);
-    	cv::Vec2d res = v2 - v1;
-
-    	if(res[1] > 0) {
-    		res = res * -1;
-    	}
-
-    	double dotP = res.dot(baseVec);
-
-    	double angle = std::acos(dotP / cv::norm(res)) * (180/3.141592);
-
-        if(angle > 90){
-        	angle = 180 - angle;
+        if(res[1] > 0) {
+            res = res * -1;
         }
 
-   		if(angle > 20 && angle < 60)
-    	{
-    		cv::line(srcImage, cv::Point(lines[i][0], lines[i][1]), cv::Point(lines[i][2], lines[i][3]), cv::Scalar(0, 255, 0), 5);	
-    	}      
-    }*/
+        double dotP = res.dot(baseVec);
+
+        double angle = std::acos(dotP / cv::norm(res)) * (180/3.141592);
+
+        if(angle > 90){
+            angle = 180 - angle;
+        }
+
+        if(angle > 20 && angle < 60)
+        {
+            //cv::line(srcImage, cv::Point(lines[i][0], lines[i][1]), cv::Point(lines[i][2], lines[i][3]), cv::Scalar(0, 255, 0), 5);
+
+            if(res[0] > 0){
+                leftLines.push_back(line);
+            }
+            else{
+                rightLines.push_back(line);
+            }
+        }      
+    }
+
+    cv::Vec4i rightMeanLine(0,0,0,0);
+    cv::Vec4i leftMeanLine(0,0,0,0);
+    if(rightLines.size() > 0 && leftLines.size() > 0){
+        for(auto line : rightLines){
+            rightMeanLine = rightMeanLine + line;
+        }
+        rightMeanLine = rightMeanLine / (int)rightLines.size();
+
+        for(auto line : leftLines){
+            leftMeanLine = leftMeanLine + line;
+        }
+        leftMeanLine = leftMeanLine / (int)leftLines.size();
+    }
+
+    cv::line(srcImage, cv::Point(rightMeanLine[0], rightMeanLine[1]), cv::Point(rightMeanLine[2], rightMeanLine[3]), cv::Scalar(255, 0, 0), 5);
+    cv::line(srcImage, cv::Point(leftMeanLine[0], leftMeanLine[1]), cv::Point(leftMeanLine[2], leftMeanLine[3]), cv::Scalar(255, 0, 0), 5);
+
+    cv::Vec2d centerDown((leftMeanLine[0] + rightMeanLine[2]) / 2, leftMeanLine[1]);
+    cv::Vec2d centerUp((leftMeanLine[2] + rightMeanLine[0]) / 2, leftMeanLine[3]);
+
+
+    cv::Vec4i centerLine(centerDown[0],centerDown[1], centerUp[0], centerUp[1]);
+
+    cv::line(srcImage, cv::Point(centerLine[0], centerLine[1]), cv::Point(centerLine[2], centerLine[3]), cv::Scalar(0, 0, 255), 5);
 
 
 
+    cv::imshow("Source Image", srcImage);
     cv::waitKey(30);
+
 }
 
 
@@ -168,6 +200,7 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
     	cv::imshow("Source Image", srcImage);
     	cv::imshow("NDVI", ndviImage);
   	}
+
 
 }
 
