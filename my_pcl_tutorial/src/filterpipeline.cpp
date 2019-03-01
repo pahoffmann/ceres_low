@@ -32,14 +32,13 @@
 
 ros::Publisher pub;
 
-
-//Class
+//Class to convert RGB to HSV and evaluate the given hsv information with threshold
 template <typename PointT>
 class ConditionThresholdHSV : public pcl::ConditionBase<PointT>
 {
 public:
     typedef typename boost::shared_ptr<ConditionThresholdHSV<PointT> > Ptr;
-
+    //Constructor
     ConditionThresholdHSV (float min_h, float max_h, float min_s, float max_s, float min_v, float max_v) :
             min_h_(min_h), max_h_(max_h), min_s_(min_s), max_s_(max_s), min_v_(min_v), max_v_(max_v)
     {
@@ -96,53 +95,28 @@ protected:
     float min_h_, max_h_, min_s_, max_s_, min_v_, max_v_;
 };
 
-
-double MedianCalc(std::vector<double> koord)
+void
+cloud_cb (const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 {
-    size_t size = koord.size();
-
-    if (size == 0)
-    {
-        return 0;  // Undefined, really.
-    }
-    else
-    {
-        sort(koord.begin(), koord.end());
-        if (size % 2 == 0)
-        {
-            return (koord[size / 2 - 1] + koord[size / 2]) / 2;
-        }
-        else
-        {
-            return koord[size / 2];
-        }
-    }
-}
-
-void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
-{
-    //Convert sensor_msgs to pcl::pointcloud<t>
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_xyz(new pcl::PointCloud<pcl::PointXYZRGB>), cloud_p (new pcl::PointCloud<pcl::PointXYZRGB>), cloud_f (new pcl::PointCloud<pcl::PointXYZRGB>);
-    //pcl::fromROSMsg (*input, *cloud_RGB);
+    // Container for original & filtered data
     pcl::PCLPointCloud2* cloud = new pcl::PCLPointCloud2;
     pcl::PCLPointCloud2ConstPtr cloudPtr(cloud);
     pcl::PCLPointCloud2 cloud_filtered;
 
-    pcl_conversions::toPCL(*input, *cloud);
+    // Convert to PCL data type
+    pcl_conversions::toPCL(*cloud_msg, *cloud);
 
 
-    // Create the filtering object: downsample the dataset using a leaf size of 1cm
+    // Perform the vortex grid filter
     pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
     sor.setInputCloud (cloudPtr);
-    sor.setLeafSize (0.007, 0.007, 0.007);
+    sor.setLeafSize (0.01f, 0.01f, 0.01f);
     sor.filter (cloud_filtered);
-
 
     pcl::PointCloud<pcl::PointXYZRGB> point_cloud;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloudPtr(new pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::fromPCLPointCloud2(cloud_filtered, point_cloud);
+    pcl::fromPCLPointCloud2( cloud_filtered, point_cloud);
     pcl::copyPointCloud(point_cloud, *point_cloudPtr);
-
 
     //passthrough filter
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr filtered_cloud (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -152,7 +126,7 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     pass.setFilterLimits (0.0, 1.0);
     //pass.setFilterLimitsNegative (true);
     pass.filter (*filtered_cloud);
-    pcl::copyPointCloud(*filtered_cloud, *point_cloudPtr);
+
 
     //colorfilter
     pcl::ConditionalRemoval<pcl::PointXYZRGB> removal_filter;
@@ -163,59 +137,146 @@ void cloud_cb (const sensor_msgs::PointCloud2ConstPtr& input)
     removal_filter.setInputCloud (filtered_cloud);
     removal_filter.filter (*point_cloudPtr);
 
-    /*
-    std::vector<double> x_koord;
-    std::vector<double> y_koord;
 
-    for (int i = 0; i < point_cloudPtr->points.size (); i++)
+// Creating the KdTree object for the search method of the extraction
+    pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGB>);
+    tree->setInputCloud(filtered_cloud);
+
+    std::vector<pcl::PointIndices> cluster_indices;
+    pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
+    ec.setClusterTolerance(0.03); // 2cm
+    ec.setMinClusterSize(20); //100
+    ec.setMaxClusterSize(10000);//99000000
+    ec.setSearchMethod(tree);
+    ec.setInputCloud(point_cloudPtr);
+    ec.extract(cluster_indices);
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr point_cloud_segmented(new pcl::PointCloud<pcl::PointXYZRGB>);
+
+    int j= 0;
+
+    for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
     {
-        x_koord.push_back(point_cloudPtr->points[i].x);
-        y_koord.push_back(point_cloudPtr->points[i].y);
+        for (std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
+        {
+            pcl::PointXYZRGB point;
+            point.x = point_cloudPtr->points[*pit].x;
+            point.y = point_cloudPtr->points[*pit].y;
+            point.z = point_cloudPtr->points[*pit].z;
+
+            if (j == 0) //Red	#FF0000	(255,0,0)
+            {
+                point.r = 0;
+                point.g = 0;
+                point.b = 255;
+            }
+            else if (j == 1) //Lime	#00FF00	(0,255,0)
+            {
+                point.r = 0;
+                point.g = 255;
+                point.b = 0;
+            }
+            else if (j == 2) // Blue	#0000FF	(0,0,255)
+            {
+                point.r = 255;
+                point.g = 0;
+                point.b = 0;
+            }
+            else if (j == 3) // Yellow	#FFFF00	(255,255,0)
+            {
+                point.r = 255;
+                point.g = 255;
+                point.b = 0;
+            }
+            else if (j == 4) //Cyan	#00FFFF	(0,255,255)
+            {
+                point.r = 0;
+                point.g = 255;
+                point.b = 255;
+            }
+            else if (j == 5) // Magenta	#FF00FF	(255,0,255)
+            {
+                point.r = 255;
+                point.g = 0;
+                point.b = 255;
+            }
+            else if (j == 6) // Olive	#808000	(128,128,0)
+            {
+                point.r = 128;
+                point.g = 128;
+                point.b = 0;
+            }
+            else if (j == 7) // Teal	#008080	(0,128,128)
+            {
+                point.r = 0;
+                point.g = 128;
+                point.b = 128;
+            }
+            else if (j == 8) // Purple	#800080	(128,0,128)
+            {
+                point.r = 128;
+                point.g = 0;
+                point.b = 128;
+            }
+            else
+            {
+                if (j % 2 == 0)
+                {
+                    point.r = 255 * j / (cluster_indices.size());
+                    point.g = 128;
+                    point.b = 50;
+                }
+                else
+                {
+                    point.r = 0;
+                    point.g = 255 * j / (cluster_indices.size());
+                    point.b = 128;
+                }
+            }
+            point_cloud_segmented->push_back(point);
+
+        }
+        j++;
     }
-
-    double x_median= MedianCalc(x_koord);
-    double y_median= MedianCalc(y_koord);
-
-    // Fill in the cloud data
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr final_koord(new pcl::PointCloud<pcl::PointXYZRGB>);
-    final_koord->width  = 1;
-    final_koord->height = 1;
-    final_koord->points.resize (final_koord->width * final_koord->height);
-
-    // Generate the data
-
-    final_koord->points[0].x = x_median;
-    final_koord->points[0].y = y_median;
-    final_koord->points[0].z = 0.0;
-    final_koord->points[0].r = 255;
-    final_koord->points[0].g = 0;
-    final_koord->points[0].b = 0;
-
-    std::cout<<final_koord->points[0].x<<std::endl;
-    std::cout<<final_koord->points[0].y<<std::endl;
-
-    */
-
-
-
+    std::cerr<< "segemnted:  " << (int)point_cloud_segmented->size() << "\n";
+    std::cerr<< "origin:     " << (int)filtered_cloud->size() << "\n";
+    // Convert to ROS data type
+    point_cloud_segmented->header.frame_id = point_cloudPtr->header.frame_id;
+    if(point_cloud_segmented->size()){
+        pcl::toPCLPointCloud2(*point_cloud_segmented, cloud_filtered);
+    }
+    else pcl::toPCLPointCloud2(*point_cloudPtr, cloud_filtered);
     sensor_msgs::PointCloud2 output;
-    pcl::toROSMsg (*point_cloudPtr, output);
+    pcl_conversions::fromPCL(cloud_filtered, output);
 
+    // Publish the data
     pub.publish (output);
+
+    /*
+    // Convert to ROS data type
+    sensor_msgs::PointCloud2 output;
+    //pcl_conversions::fromPCL(*point_cloudPtr, output);
+    pcl::toROSMsg(*point_cloudPtr, output);
+
+    // Publish the data
+    pub.publish (output);
+     */
+
 }
 
-int main (int argc, char** argv)
+int
+main (int argc, char** argv)
 {
-  // Initialize ROS
-  ros::init (argc, argv, "my_pcl_tutorial");
-  ros::NodeHandle nh;
+    // Initialize ROS
+    ros::init (argc, argv, "my_pcl_tutorial");
+    ros::NodeHandle nh;
 
-  // Create a ROS subscriber for the input point cloud
-  ros::Subscriber sub = nh.subscribe ("input", 1, cloud_cb);
+    // Create a ROS subscriber for the input point cloud
+    ros::Subscriber sub = nh.subscribe ("input", 1, cloud_cb);
 
-  // Create a ROS publisher for the output point cloud
-  pub = nh.advertise<sensor_msgs::PointCloud2> ("output", 1);
+    // Create a ROS publisher for the output point cloud
+    pub = nh.advertise<sensor_msgs::PointCloud2> ("output", 1);
 
-  // Spin
-  ros::spin ();
+    // Spin
+    ros::spin ();
 }
