@@ -7,44 +7,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <librealsense2/rs.hpp>
+#include <librealsense2/rsutil.h> //transform between coordinate systems
+//#include <librealsense2/h/rs_sensor.h>
+
 
 
 
 
 using namespace std;
 using namespace cv;
+using namespace rs2;
 
-/*
-
-class myLitClass
-{
-	public:
-		cv::Mat rgbImage;
-		cv::Mat irImage;
-
-		myLitClass(){
-
-		}
-
-		void imageCallback(const sensor_msgs::ImageConstPtr& msg){
-			 rgbImage = cv_bridge::toCvShare(msg, "bgr8")->image;
-			 cv::imshow("Infrared", rgbImage);
-		}
-		void infraCallback(const sensor_msgs::ImageConstPtr& msg){
-			irImage = cv_bridge::toCvShare(msg, "8UC1")->image;
- 			cv::imshow("Infrared", irImage);
-		}
-
-		cv::Mat getInfraMat(){
-			return irImage;
-		}
-
-		cv::Mat getRGBImage(){
-			return rgbImage;
-		}
-};
-
-*/
 
 Mat srcImage;
 Mat irImage;
@@ -67,7 +41,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 
 
-// convert to HSV color space
+    // convert to HSV color space
     Mat hsvImage;
     cvtColor(srcImage, hsvImage, CV_BGR2HSV);
 
@@ -236,7 +210,13 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
 
 	if(!irImage.empty() && !srcImage.empty()){
 
-        
+        //todo:: crop image
+
+        Rect rectCrop(320,240,400,300);
+
+        Mat cropped(irImage, rectCrop);
+        irImage = cropped;
+
 
         cvtColor(srcImage,srcImage,COLOR_HSV2BGR); //convert?
 
@@ -250,8 +230,10 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
         cv::Mat bgrChannel[3];
         cv::split(srcImage, bgrChannel);
 
-        cv::Mat ndviImage1 = (irImage - bgrChannel[2]); //numerator (IR - RED)
-        cv::Mat ndviImage2 = (irImage + bgrChannel[2]); //denominator (IR + RED)
+        cv::Mat ndviImage1;
+        cv::addWeighted(irImage, 1, bgrChannel[2], -1, 0.0, ndviImage1);// = (irImage - bgrChannel[2]); //numerator (IR - RED)
+        cv::Mat ndviImage2;// = (irImage + bgrChannel[2]);
+        cv::addWeighted(irImage, 1, bgrChannel[2], 1, 0.0, ndviImage2); //denominator (IR + RED)
         cv::Mat res;
         cv::divide(ndviImage1,ndviImage2, res); //denominator, numerator
 
@@ -268,20 +250,30 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
             std::cout << std::endl;
         }*/
 
-        Mat newHSL;
-        applyColorMap(res, newHSL, COLORMAP_HSV);
+        //Mat newHSL;
+        //applyColorMap(res, newHSL, COLORMAP_HSV);
         /*Mat color;
         cvtColor(newHSL,color,COLOR_HSV2BGR);*/
 
 		cv::imshow("Infrared", irImage);
     	cv::imshow("Source Image", srcImage);
-    	cv::imshow("NDVI", newHSL);
+    	cv::imshow("NDVI", res);
   	}
 
 
 }
 
+/*rs2_extrinsics getExtrinsics(){
 
+    rs2::pipeline pipe;
+
+    rs2::config config;
+    config.enable_stream(RS_STREAM_COLOR, RS2_FORMAT_RGBA8);
+    config.enable_stream(RS_STREAM_INFRARED);
+
+
+
+}*/
 
 int main(int argc, char **argv)
 {  
