@@ -212,11 +212,12 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
 
         //todo:: crop image
 
-        Rect rectCrop(320,240,400,300);
+        Rect rectCrop(106, 89, 400,300); // don't change these values pls
 
-        Mat cropped(irImage, rectCrop);
-        irImage = cropped;
+        Mat cropped = irImage(rectCrop);
+        Mat croppedNew(480, 640, CV_8UC1);
 
+        resize(cropped, croppedNew, croppedNew.size(), 0, 0, CV_INTER_CUBIC);
 
         cvtColor(srcImage,srcImage,COLOR_HSV2BGR); //convert?
 
@@ -254,10 +255,10 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
         //applyColorMap(res, newHSL, COLORMAP_HSV);
         /*Mat color;
         cvtColor(newHSL,color,COLOR_HSV2BGR);*/
-
-		cv::imshow("Infrared", irImage);
+        cv::imshow("dsds", croppedNew);
+		//cv::imshow("Infrared", irImage);
     	cv::imshow("Source Image", srcImage);
-    	cv::imshow("NDVI", res);
+    	//cv::imshow("NDVI", res);
   	}
 
 
@@ -284,7 +285,7 @@ int main(int argc, char **argv)
     image_transport::ImageTransport it(nh);
 
     image_transport::Subscriber sub = it.subscribe("camera/color/image_raw", 1, imageCallback);
-    image_transport::Subscriber sub2 = it.subscribe("camera/infra2/image_rect_raw", 1, infraCallback);
+    image_transport::Subscriber sub2 = it.subscribe("camera/infra1/image_rect_raw", 1, infraCallback);
 
 
 
