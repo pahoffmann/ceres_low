@@ -8,8 +8,6 @@
 #include <stdlib.h>
 
 #include <librealsense2/rs.hpp>
-#include <librealsense2/rsutil.h> //transform between coordinate systems
-#include <librealsense2/h/rs_sensor.h>
 
 #include <dynamic_reconfigure/DoubleParameter.h>
 #include <dynamic_reconfigure/Reconfigure.h>
@@ -30,13 +28,12 @@ void disableEmitter(){
 	dynamic_reconfigure::Config config;
 
 	double_param.name = "Emitter_Enabled";
-	double_param.value = false;
+	double_param.value = 0;
 	config.doubles.push_back(double_param);
 	
 	srv_req.config = config;
 
 	ros::service::call("/joint_commander/set_parameters", srv_req, srv_resp);
-
 }
 
 Mat srcImage;
@@ -178,7 +175,14 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     cv::imshow("Green-Detection", srcImage);
 
 }
+void infoCallback(const sensor_msgs::CameraInfo &camera_info){
+	cout << camera_info << endl;
+	//P[0] f(x), P[2]c(x), P[5]f(y), P[6]c(y)
+	// f(x), f(y) = Focal Length
+	// c(x), x(y) = Principal Point
 
+
+}
 
 void infraCallback(const sensor_msgs::ImageConstPtr& msg){
 
@@ -210,7 +214,7 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
         res.convertTo(res, CV_8UC1);
 
         applyColorMap(res, newHSL, COLORMAP_JET);
-    	//imshow("Infrared Image", irImage);
+    	imshow("Infrared Image", irImage);
     	imshow("NDVI", newHSL);
     	waitKey(30);
   	}
@@ -218,28 +222,19 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
 
 }
 
-/*rs2_extrinsics getExtrinsics(){
-
-    rs2::pipeline pipe;
-
-    rs2::config config;
-    config.enable_stream(rs2_stream::RS2_STREAM_COLOR, RS2_FORMAT_RGBA8);
-
-
-}*/
-
 
 int main(int argc, char **argv)
 {  
 
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
-	disableEmitter();
-
+    disableEmitter();
 
     image_transport::ImageTransport it(nh);
     image_transport::Subscriber sub = it.subscribe("camera/color/image_raw", 1, imageCallback);
     image_transport::Subscriber sub2 = it.subscribe("camera/infra1/image_rect_raw", 1, infraCallback);
+    ros::Subscriber sub3 = nh.subscribe("camera/color/camera_info", 1, infoCallback);
+
     ros::spin();
 
     return 0;
