@@ -9,10 +9,11 @@
 
 #include <librealsense2/rs.hpp>
 #include <librealsense2/rsutil.h> //transform between coordinate systems
-//#include <librealsense2/h/rs_sensor.h>
+#include <librealsense2/h/rs_sensor.h>
 
-
-
+#include <dynamic_reconfigure/DoubleParameter.h>
+#include <dynamic_reconfigure/Reconfigure.h>
+#include <dynamic_reconfigure/Config.h>
 
 
 using namespace std;
@@ -20,8 +21,27 @@ using namespace cv;
 using namespace rs2;
 
 
+
+void disableEmitter(){
+
+	dynamic_reconfigure::ReconfigureRequest srv_req;
+	dynamic_reconfigure::ReconfigureResponse srv_resp;
+	dynamic_reconfigure::DoubleParameter double_param;
+	dynamic_reconfigure::Config config;
+
+	double_param.name = "Emitter_Enabled";
+	double_param.value = false;
+	config.doubles.push_back(double_param);
+	
+	srv_req.config = config;
+
+	ros::service::call("/joint_commander/set_parameters", srv_req, srv_resp);
+
+}
+
 Mat srcImage;
 Mat irImage;
+Mat splitImage;
 int minLineLength = 175;
 int maxLineGap = 100;
 
@@ -32,8 +52,10 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 
     srcImage = cv_bridge::toCvShare(msg, "bgr8")->image;
+    splitImage = cv_bridge::toCvShare(msg, "bgr8")->image;
+
     //srcImage.convertTo(srcImage, CV_32F);
-/*
+
 
     double x;
     double y;
@@ -85,8 +107,6 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     hueMask = (hueMask & saturationMask) & valueMask;
 
-    cv::imshow("Desired Color Only", hueMask);
-
     // perform the line detection
     std::vector<cv::Vec4i> lines;
     cv::HoughLinesP(hueMask, lines, 1, CV_PI / 360, 50, minLineLength, maxLineGap);
@@ -100,8 +120,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
         cv::Vec4i line = lines[i];
 
 
-        cv::Vec2d v1(line[0], line[1]);
-        cv::Vec2d v2(line[2], line[3]);
+        cv::Vec2d v1(line[0], line[1]); //x1 and y1
+        cv::Vec2d v2(line[2], line[3]); //x2 and y2
         cv::Vec2d baseVec(1, 0);
         cv::Vec2d res = v2 - v1;
 
@@ -155,122 +175,42 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     cv::line(srcImage, cv::Point(centerLine[0], centerLine[1]), cv::Point(centerLine[2], centerLine[3]), cv::Scalar(0, 0, 255), 5);
 
+    cv::imshow("Green-Detection", srcImage);
 
-
-    cv::imshow("Source Image", srcImage);
-    cv::waitKey(30);
-*/
 }
 
 
 void infraCallback(const sensor_msgs::ImageConstPtr& msg){
 
 	irImage = cv_bridge::toCvShare(msg, "8UC1")->image;
-	/*cv::Mat bgrChannel[3];
-	cv::split(srcImage, bgrChannel);
+  
+	if(!irImage.empty() && !splitImage.empty()){
 
-	cv::Mat ndviImage1 = (irImage - bgrChannel[2]); 
-    cv::Mat ndviImage2 = (irImage + bgrChannel[2]);
-    cv::Mat res;
-    cv::divide(ndviImage2,ndviImage1, res);
-
-    cv::Mat newHue = (res.clone()) * (180); // float 32
-    //cv::Mat newLigthness = cv::Mat::ones(irImage.rows, irImage.cols, CV_32FC1);
-    //cv::Mat newSaturation = cv::Mat::ones(irImage.rows, irImage.cols, CV_32FC1);*/
-
-
-    //Just testing some stuff here..
-    /*Mat newHSL;
-    if(!srcImage.empty()){
-        cvtColor(srcImage,srcImage,COLOR_HSV2BGR);
-        std::vector<Mat> channels;
-        split(srcImage, channels);
-        Mat numeratorMat = channels[2] - channels[0]; // red - blue
-        Mat denominatorMat = channels[2] + channels[0]; // red + blue
-        Mat ratio;
-        cv::divide(denominatorMat, numeratorMat, ratio, 1., 5); // here 5 specifies type of ratio (CV_32FC1)
-
-        Mat newHue = (ratio.clone() - 0.5 ) * (-360); // float 32
-        Mat newLigthness = Mat::ones(srcImage.rows, srcImage.cols, CV_32FC1);
-        Mat newSaturation = Mat::ones(srcImage.rows, srcImage.cols, CV_32FC1);
-
-        vector<Mat> newChannels;
-        newChannels.push_back(newHue);
-        newChannels.push_back(newSaturation);
-        newChannels.push_back(newLigthness);
-        cv::merge(newChannels, newHSL); 
-
-        normalize(ratio, ratio, 0, 255, NORM_MINMAX, CV_8UC1);
-        //or: normalize(ratio, ratio, 127,127,NORM_L2,CV_8UC1);
-        // Apply a color map 
-        applyColorMap(ratio, newHSL, COLORMAP_HSV);
-    }*/
-    
-
-
-	if(!irImage.empty() && !srcImage.empty()){
-
-        //todo:: crop image
+        Mat res, cropped;
+        Mat numerator, denominator, newHSL;
+        Mat bgrChannel[3];
 
         Rect rectCrop(106, 89, 400,300); // don't change these values pls
 
-        Mat cropped = irImage(rectCrop);
+        cropped = irImage(rectCrop);
         Mat croppedNew(480, 640, CV_8UC1);
 
         resize(cropped, croppedNew, croppedNew.size(), 0, 0, CV_INTER_CUBIC);
 
         irImage = croppedNew;
 
-        //irImage.convertTo(irImage, CV_32F);
+        split(splitImage, bgrChannel);
 
-        //cvtColor(srcImage,srcImage,COLOR_HSV2BGR); //convert?
-
-        /*for(int i = 0; i < srcImage.rows; i++){
-            for(int j = 0; j < srcImage.rows; j++){
-                std::cout << srcImage.at<double>(i,j) << "  ||  ";
-            }
-            std::cout << std::endl;
-        }*/
-
-        cv::Mat bgrChannel[3];
-        cv::split(srcImage, bgrChannel);
-
-
-        cv::Mat ndviImage1;
-        cv::addWeighted(irImage, 1, bgrChannel[2], -1, 0.0, ndviImage1, CV_32F);// = (irImage - bgrChannel[2]); //numerator (IR - RED)
-        cv::Mat ndviImage2;// = (irImage + bgrChannel[2]);
-        cv::addWeighted(irImage, 1, bgrChannel[2], 1, 0.0, ndviImage2, CV_32F); //denominator (IR + RED)
-        cv::Mat res;
-
-        cv::divide(ndviImage1,ndviImage2, res); //denominator, numerator
+        addWeighted(irImage, 1, bgrChannel[2], -1, 0.0, numerator, CV_32F);
+        addWeighted(irImage, 1, bgrChannel[2], 1, 0.0, denominator, CV_32F);
+        divide(numerator, denominator, res);
 
 
         normalize(res, res, 0, 255, NORM_MINMAX);
         res.convertTo(res, CV_8UC1);
-        //normalize(res, res, 127,127,NORM_L2,CV_8UC1);
-        
-        // Apply a color map
-        //res = (res * 90) + 90;
 
-        /*for(int i = 0; i < res.rows; i++){
-            for(int j = 0; j < res.rows; j++){
-                std::cout << res.at<double>(i,j) << "  ||  ";
-            }
-            std::cout << std::endl;
-        }*/
-
-
-
-        Mat newHSL;
-        //res.convertTo(res, CV_8UC1, 255/(max-min), -min);
         applyColorMap(res, newHSL, COLORMAP_JET);
-        //Mat color;
-        //cvtColor(newHSL,color,COLOR_HSV2BGR);
-        //irImage.convertTo(irImage,CV_8U);
-        //srcImage.convertTo(srcImage, CV_8U);
-		//cv::imshow("Infrared", irImage);
-    	//cv::imshow("Source Image", srcImage);
-    	cv::imshow("NDVI", newHSL);
+    	imshow("NDVI", newHSL);
     	waitKey(30);
   	}
 
@@ -282,28 +222,24 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
     rs2::pipeline pipe;
 
     rs2::config config;
-    config.enable_stream(RS_STREAM_COLOR, RS2_FORMAT_RGBA8);
-    config.enable_stream(RS_STREAM_INFRARED);
-
+    config.enable_stream(rs2_stream::RS2_STREAM_COLOR, RS2_FORMAT_RGBA8);
 
 
 }*/
 
+
 int main(int argc, char **argv)
 {  
+
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
+	disableEmitter();
 
 
     image_transport::ImageTransport it(nh);
-
     image_transport::Subscriber sub = it.subscribe("camera/color/image_raw", 1, imageCallback);
     image_transport::Subscriber sub2 = it.subscribe("camera/infra1/image_rect_raw", 1, infraCallback);
-
-
-
     ros::spin();
-
 
     return 0;
 
