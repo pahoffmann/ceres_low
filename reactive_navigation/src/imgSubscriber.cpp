@@ -32,7 +32,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 
     srcImage = cv_bridge::toCvShare(msg, "bgr8")->image;
-
+    //srcImage.convertTo(srcImage, CV_32F);
+/*
 
     double x;
     double y;
@@ -158,14 +159,13 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     cv::imshow("Source Image", srcImage);
     cv::waitKey(30);
-
+*/
 }
 
 
 void infraCallback(const sensor_msgs::ImageConstPtr& msg){
 
 	irImage = cv_bridge::toCvShare(msg, "8UC1")->image;
-
 	/*cv::Mat bgrChannel[3];
 	cv::split(srcImage, bgrChannel);
 
@@ -219,7 +219,11 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
 
         resize(cropped, croppedNew, croppedNew.size(), 0, 0, CV_INTER_CUBIC);
 
-        cvtColor(srcImage,srcImage,COLOR_HSV2BGR); //convert?
+        irImage = croppedNew;
+
+        //irImage.convertTo(irImage, CV_32F);
+
+        //cvtColor(srcImage,srcImage,COLOR_HSV2BGR); //convert?
 
         /*for(int i = 0; i < srcImage.rows; i++){
             for(int j = 0; j < srcImage.rows; j++){
@@ -231,18 +235,22 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
         cv::Mat bgrChannel[3];
         cv::split(srcImage, bgrChannel);
 
+
         cv::Mat ndviImage1;
-        cv::addWeighted(irImage, 1, bgrChannel[2], -1, 0.0, ndviImage1);// = (irImage - bgrChannel[2]); //numerator (IR - RED)
+        cv::addWeighted(irImage, 1, bgrChannel[2], -1, 0.0, ndviImage1, CV_32F);// = (irImage - bgrChannel[2]); //numerator (IR - RED)
         cv::Mat ndviImage2;// = (irImage + bgrChannel[2]);
-        cv::addWeighted(irImage, 1, bgrChannel[2], 1, 0.0, ndviImage2); //denominator (IR + RED)
+        cv::addWeighted(irImage, 1, bgrChannel[2], 1, 0.0, ndviImage2, CV_32F); //denominator (IR + RED)
         cv::Mat res;
+
         cv::divide(ndviImage1,ndviImage2, res); //denominator, numerator
 
-        //normalize(res, res, 0, 255, NORM_MINMAX, CV_8UC1);
-        //normalize(res, res, 127,127,NORM_L2,CV_8UC1);
-        // Apply a color map
 
-        res = (res * 90) + 90;
+        normalize(res, res, 0, 255, NORM_MINMAX);
+        res.convertTo(res, CV_8UC1);
+        //normalize(res, res, 127,127,NORM_L2,CV_8UC1);
+        
+        // Apply a color map
+        //res = (res * 90) + 90;
 
         /*for(int i = 0; i < res.rows; i++){
             for(int j = 0; j < res.rows; j++){
@@ -251,14 +259,19 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
             std::cout << std::endl;
         }*/
 
-        //Mat newHSL;
-        //applyColorMap(res, newHSL, COLORMAP_HSV);
-        /*Mat color;
-        cvtColor(newHSL,color,COLOR_HSV2BGR);*/
-        cv::imshow("dsds", croppedNew);
+
+
+        Mat newHSL;
+        //res.convertTo(res, CV_8UC1, 255/(max-min), -min);
+        applyColorMap(res, newHSL, COLORMAP_JET);
+        //Mat color;
+        //cvtColor(newHSL,color,COLOR_HSV2BGR);
+        //irImage.convertTo(irImage,CV_8U);
+        //srcImage.convertTo(srcImage, CV_8U);
 		//cv::imshow("Infrared", irImage);
-    	cv::imshow("Source Image", srcImage);
-    	//cv::imshow("NDVI", res);
+    	//cv::imshow("Source Image", srcImage);
+    	cv::imshow("NDVI", newHSL);
+    	waitKey(30);
   	}
 
 
