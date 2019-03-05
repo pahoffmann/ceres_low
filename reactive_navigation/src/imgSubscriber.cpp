@@ -190,7 +190,7 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
         Mat numerator, denominator, newHSL;
         Mat bgrChannel[3];
 
-        Rect rectCrop(106, 89, 400,300); // don't change these values pls
+        Rect rectCrop(116, 89, 400,300);
 
         cropped = irImage(rectCrop);
         Mat croppedNew(480, 640, CV_8UC1);
@@ -210,6 +210,7 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
         res.convertTo(res, CV_8UC1);
 
         applyColorMap(res, newHSL, COLORMAP_JET);
+    	//imshow("Infrared Image", irImage);
     	imshow("NDVI", newHSL);
     	waitKey(30);
   	}
