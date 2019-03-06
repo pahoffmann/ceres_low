@@ -20,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(PCL 1.8 REQUIRED COMPONENTS common)
 find_package(OpenCV 3 REQUIRED)
+find_package(realsense2 REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -208,5 +209,5 @@ target_link_libraries(imgBroadcast ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 
 add_executable(imgSubscriber src/imgSubscriber.cpp)
-target_link_libraries(imgSubscriber ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
+target_link_libraries(imgSubscriber ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${realsense2_LIBRARY})
 
