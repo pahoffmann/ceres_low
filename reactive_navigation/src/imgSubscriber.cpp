@@ -1,17 +1,19 @@
 #include <ros/ros.h>
+#include <geometry_msgs/Twist.h>
+
 #include <image_transport/image_transport.h>
 #include "opencv2/imgproc/imgproc.hpp"
 #include <opencv2/highgui/highgui.hpp>
-
 #include <cv_bridge/cv_bridge.h>
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
-#include <boost/array.hpp>
 
-#include <librealsense2/rs.hpp>
+#include <boost/array.hpp>
 
 #include <dynamic_reconfigure/DoubleParameter.h>
 #include <dynamic_reconfigure/Reconfigure.h>
@@ -20,7 +22,6 @@
 
 using namespace std;
 using namespace cv;
-using namespace rs2;
 using namespace pcl;
 
 
@@ -31,9 +32,24 @@ Mat srcImage;
 Mat irImage;
 Mat depthImage;
 Mat splitImage;
-ros::Publisher pointcloud_publisher;
-int minLineLength = 175;
-int maxLineGap = 100;
+ros::Publisher pub;
+int minLineLength = 100;
+int maxLineGap = 50;
+float max_angle = 10;
+
+bool hasSeenLines = false;
+
+std::deque<Vec2d> last3Lines; //we need to pop front
+
+
+
+float calcAngleBetweenVectors(Vec2d v1, Vec2d v2){
+	auto scalar = v1.dot(v2);
+	float norm1 = cv::norm(v1);
+	float norm2 = cv::norm(v2);
+
+	return acos(scalar/(norm1 * norm2)) * (180/M_PI);
+}
 
 
 void disableEmitter(){
@@ -50,14 +66,6 @@ void disableEmitter(){
 	srv_req.config = config;
 
 	ros::service::call("/joint_commander/set_parameters", srv_req, srv_resp);
-}
-
-
-
-vector<Vec4i> detectFeatures(){
-
-
-
 }
 
 
@@ -141,9 +149,9 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
             result = result * -1;
         }
 
-        double dotP = result.dot(baseVec);
+        double angle = calcAngleBetweenVectors(result, baseVec);
 
-        double angle = std::acos(dotP / cv::norm(result)) * (180/3.141592);
+        double dotP = result.dot(baseVec);
 
         if(angle > 90){
             angle = 180 - angle;
@@ -162,45 +170,143 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
         }      
     }
 
-    Vec4i rightMeanLine(0,0,0,0);
-    Vec4i leftMeanLine(0,0,0,0);
-    if(rightLines.size() > 0 && leftLines.size() > 0){
-        for(auto line : rightLines){
-            rightMeanLine = rightMeanLine + line;
-        }
-        rightMeanLine = rightMeanLine / (int)rightLines.size();
+    if(leftLines.size() > 0 && rightLines.size() > 0){
+    	hasSeenLines = true;
+    	Vec4i rightMeanLine(0,0,0,0);
+	    Vec4i leftMeanLine(0,0,0,0);
+	    if(rightLines.size() > 0 && leftLines.size() > 0){
+	        for(auto line : rightLines){
+	            rightMeanLine = rightMeanLine + line;
+	        }
+	        rightMeanLine = rightMeanLine / (int)rightLines.size();
 
-        for(auto line : leftLines){
-            leftMeanLine = leftMeanLine + line;
-        }
-        leftMeanLine = leftMeanLine / (int)leftLines.size();
+	        for(auto line : leftLines){
+	            leftMeanLine = leftMeanLine + line;
+	        }
+	        leftMeanLine = leftMeanLine / (int)leftLines.size();
+	    }
+
+	    cv::line(srcImage, cv::Point(rightMeanLine[0], rightMeanLine[1]), cv::Point(rightMeanLine[2], rightMeanLine[3]), cv::Scalar(255, 0, 0), 5);
+	    cv::line(srcImage, cv::Point(leftMeanLine[0], leftMeanLine[1]), cv::Point(leftMeanLine[2], leftMeanLine[3]), cv::Scalar(255, 0, 0), 5);
+
+	    cv::Vec2d centerDown((leftMeanLine[0] + rightMeanLine[2]) / 2, leftMeanLine[1]);
+	    cv::Vec2d centerUp((leftMeanLine[2] + rightMeanLine[0]) / 2, leftMeanLine[3]);
+
+
+	    cv::Vec4i centerLine(320, 480, centerUp[0], centerUp[1]);
+
+	    cv::line(srcImage, cv::Point(centerLine[0], centerLine[1]), cv::Point(centerLine[2], centerLine[3]), cv::Scalar(0, 0, 255), 5);
+
+
+		//imshow("Color Image", srcImage);
+
+		//TODO: calc angle, publish data
+
+		Vec2d vertical(0, -1);
+		Vec2d middle = centerUp - Vec2d(320,480);
+
+		//save center line
+		if(last3Lines.size() == 3){
+			last3Lines.pop_front();
+		}
+		last3Lines.push_back(middle);
+
+		angle = calcAngleBetweenVectors(vertical, middle);
+
+
+		/*
+		* Calculate the accel param, which will be between 0 and 1. For small angles it will tend to 1, for bigger angles, it will tend to 0
+		* This way, the acceleration is limited by the current position in the field
+		*/
+		auto accel = ( std::sin(((angle * M_PI) / max_angle)) + 1) / 2;
+
+
+
+		cout << "Acceleration: " << accel << endl;
+
+		geometry_msgs::Twist twistMsg;
+
+
+
+		if(angle > 10){
+
+			if(middle[0] < 0){
+				twistMsg.angular.z = 0.1 * accel;
+			} 
+
+			else if(middle[0] > 0) {
+				twistMsg.angular.z = -0.1 * accel;
+			} 
+			cout << "Angle to big! I'll better turn around.." << endl;
+		}
+		else{
+
+			twistMsg.linear.x = accel * 0.3;
+
+			if(middle[0] < 0){
+				twistMsg.angular.z = 0.25 * accel;
+			} 
+
+			else if(middle[0] > 0) {
+				twistMsg.angular.z = -0.25 * accel;
+			} 
+			else {
+				twistMsg.angular.z = 0;
+			}
+		}
+
+		pub.publish(twistMsg);
+
+    } else{
+    	//no line seen :( 
+
+    	geometry_msgs::Twist twistMsg;
+
+    	if(hasSeenLines){
+
+    		float angleCurrentlyNoLineSeen;
+    		Vec2d averageVec(0,0);
+
+
+    		for(Vec2d vec : last3Lines){
+    			angleCurrentlyNoLineSeen += calcAngleBetweenVectors(vec, Vec2d(0, -1));
+    			averageVec +=  vec;
+    		}
+
+    		angleCurrentlyNoLineSeen /=  last3Lines.size();
+
+    		divide(last3Lines.size(), averageVec, averageVec);
+    		//averageVec /= last3Lines.size();
+
+    		float accel = (std::sin(((angleCurrentlyNoLineSeen * M_PI) / max_angle)) + 1) / 2;
+
+    		twistMsg.linear.x = 0.3 * accel;
+
+    		if(averageVec[0] < 0){
+				twistMsg.angular.z = 0.15 * accel;
+			} 
+
+			else if(averageVec[0] > 0) {
+				twistMsg.angular.z = -0.15 * accel;
+			} 
+			else {
+				twistMsg.angular.z = 0;
+			}
+
+
+
+    		twistMsg.linear.x = 0.3;
+
+    		pub.publish(twistMsg);
+
+    	} else {
+
+    		twistMsg.angular.z = 0.15;
+
+    		pub.publish(twistMsg);
+    	}
+    	
     }
-
-    cv::line(srcImage, cv::Point(rightMeanLine[0], rightMeanLine[1]), cv::Point(rightMeanLine[2], rightMeanLine[3]), cv::Scalar(255, 0, 0), 5);
-    cv::line(srcImage, cv::Point(leftMeanLine[0], leftMeanLine[1]), cv::Point(leftMeanLine[2], leftMeanLine[3]), cv::Scalar(255, 0, 0), 5);
-
-    cv::Vec2d centerDown((leftMeanLine[0] + rightMeanLine[2]) / 2, leftMeanLine[1]);
-    cv::Vec2d centerUp((leftMeanLine[2] + rightMeanLine[0]) / 2, leftMeanLine[3]);
-
-
-    cv::Vec4i centerLine(320, 480, centerUp[0], centerUp[1]);
-
-    cv::line(srcImage, cv::Point(centerLine[0], centerLine[1]), cv::Point(centerLine[2], centerLine[3]), cv::Scalar(0, 0, 255), 5);
-
-
-	imshow("Color Image", srcImage);
-
-	//TODO: calc angle, publish data
-
-	Vec2d vertical(0, -1);
-	Vec2d middle = centerUp - Vec2d(320,480);
-
-	auto scalar = vertical.dot(middle);
-	float norm = cv::norm(middle);
-
-	angle = acos(scalar/(norm)) * (180/3.141592);
-
-	cout << "Winkel: " << angle << endl;
 
 	//angle calculation done
 
@@ -262,7 +368,7 @@ void infoCallback(const sensor_msgs::CameraInfo &camera_info){
 		pcl::toROSMsg(*pointcloud, out);
 		out.header.frame_id = "camera_link";
 
-		pointcloud_publisher.publish(out);
+		//pointcloud_publisher.publish(out);
 
 	}
 
@@ -385,7 +491,7 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
 
 	        double dotP = result.dot(baseVec);
 
-	        double angle = std::acos(dotP / cv::norm(result)) * (180/3.141592);
+	        double angle = std::acos(dotP / cv::norm(result)) * (180/M_PI);
 
 	        if(angle > 90){
 	            angle = 180 - angle;
@@ -451,8 +557,7 @@ int main(int argc, char **argv)
     //image_transport::Subscriber sub2 = it.subscribe("camera/infra1/image_rect_raw", 1, infraCallback);
     //image_transport::Subscriber sub3 = it.subscribe("camera/aligned_depth_to_color/image_raw", 1, depthCallback);
 	//ros::Subscriber sub4 = nh.subscribe("camera/color/camera_info", 1, infoCallback);
-
-	//pointcloud_publisher = nh.advertise<sensor_msgs::PointCloud2>("myPointCloud", 1);
+	pub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
     
     ros::spin();
 
