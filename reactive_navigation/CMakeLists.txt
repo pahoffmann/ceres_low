@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.3.1)
 project(reactive_navigation)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
@@ -10,10 +10,12 @@ add_compile_options(-std=c++14)
 find_package(catkin REQUIRED COMPONENTS
 #  pcl_conversions
 #  pcl_ros
+  rospy
   roscpp
   sensor_msgs
   cv_bridge
   image_transport
+  dynamic_reconfigure
 )
 
 ## System dependencies are found with CMake's conventions
@@ -94,10 +96,9 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
+ generate_dynamic_reconfigure_options(
+    cfg/navigation.cfg
+ )
 
 ###################################
 ## catkin specific configuration ##
@@ -204,10 +205,8 @@ include_directories(
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
-add_executable(imgBroadcast src/imgBroadcast.cpp)
-target_link_libraries(imgBroadcast ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
-
 
 add_executable(imgSubscriber src/imgSubscriber.cpp)
+add_dependencies(imgSubscriber ${PROJECT_NAME}_gencfg)
 target_link_libraries(imgSubscriber ${catkin_LIBRARIES} ${OpenCV_LIBRARIES} ${realsense2_LIBRARY})
 
