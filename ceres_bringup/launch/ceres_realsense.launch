@@ -20,4 +20,7 @@
   <include file="$(find ceres_bringup)/launch/sick_$(arg sensor).launch"/> 
   <include if="$(arg use_imu)" file="$(find ceres_bringup)/launch/imu_single_nodes.launch"/>
 
+  ### EKF
+  <include if="$(arg use_ekf)" file="$(find ceres_bringup)/launch/ekf.launch"/>
+
 </launch>
