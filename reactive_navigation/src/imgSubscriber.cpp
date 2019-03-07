@@ -33,7 +33,7 @@ Mat irImage;
 Mat depthImage;
 Mat splitImage;
 ros::Publisher pub;
-int minLineLength = 100;
+int minLineLength = 150;
 int maxLineGap = 50;
 float max_angle = 10;
 
@@ -241,14 +241,14 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 		}
 		else{
 
-			twistMsg.linear.x = accel * 0.3;
+			twistMsg.linear.x = accel * 0.25;
 
 			if(middle[0] < 0){
-				twistMsg.angular.z = 0.25 * accel;
+				twistMsg.angular.z = 0.35 * accel;
 			} 
 
 			else if(middle[0] > 0) {
-				twistMsg.angular.z = -0.25 * accel;
+				twistMsg.angular.z = -0.35 * accel;
 			} 
 			else {
 				twistMsg.angular.z = 0;
@@ -283,11 +283,11 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     		twistMsg.linear.x = 0.3 * accel;
 
     		if(averageVec[0] < 0){
-				twistMsg.angular.z = 0.15 * accel;
+				twistMsg.angular.z = 0.3 * accel;
 			} 
 
 			else if(averageVec[0] > 0) {
-				twistMsg.angular.z = -0.15 * accel;
+				twistMsg.angular.z = -0.3 * accel;
 			} 
 			else {
 				twistMsg.angular.z = 0;
@@ -301,7 +301,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     	} else {
 
-    		twistMsg.angular.z = 0.15;
+    		twistMsg.angular.z = 0.3;
 
     		pub.publish(twistMsg);
     	}
