@@ -1,6 +1,9 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 
+#include <dynamic_reconfigure/server.h>
+#include <reactive_navigation/navigationConfig.h>
+
 #include <image_transport/image_transport.h>
 #include "opencv2/imgproc/imgproc.hpp"
 #include <opencv2/highgui/highgui.hpp>
@@ -13,6 +16,7 @@
 //#include <pcl/point_types.h>
 //#include <pcl_conversions/pcl_conversions.h>
 
+#include <deque>
 #include <boost/array.hpp>
 
 #include <dynamic_reconfigure/DoubleParameter.h>
@@ -33,11 +37,18 @@ Mat irImage;
 Mat depthImage;
 Mat splitImage;
 ros::Publisher pub;
-int minLineLength = 100;
-int maxLineGap = 50;
-float max_angle = 10;
+
+int minLineLength;// = 175;
+int maxLineGap;// = 50;
+
+float maxAngle;// = 10;
+float linearX = 0;// = 0.2;
+float angularZ;// = 0.2;
+float angularZouter;
+
 
 bool hasSeenLines = false;
+
 
 std::deque<Vec2d> last3Lines; //we need to pop front
 
@@ -95,7 +106,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     // hue channels tells you the color tone, if saturation and value aren't too low.
 
     int hueValue = 50; // green color
-    int hueRange = 15; // how much difference from the desired color we want to include to the result If you increase this value, for example a red color would detect some orange values, too.
+    int hueRange = 20; // how much difference from the desired color we want to include to the result If you increase this value, for example a red color would detect some orange values, too.
 
     int minSaturation = 50;
     int minValue = 50; 
@@ -149,15 +160,19 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
             result = result * -1;
         }
 
-        double angle = calcAngleBetweenVectors(result, baseVec);
+        //double angle = calcAngleBetweenVectors(result, baseVec);
+
+        //std::cout << "Angle calculating the line angle: " << angle << endl;
 
         double dotP = result.dot(baseVec);
+
+        double angle = std::acos(dotP / cv::norm(result)) * (180/3.141592);
 
         if(angle > 90){
             angle = 180 - angle;
         }
 
-        if(angle > 20 && angle < 60)
+        if(angle > 20 && angle < 40)
         {
             //cv::line(srcImage, cv::Point(lines[i][0], lines[i][1]), cv::Point(lines[i][2], lines[i][3]), cv::Scalar(0, 255, 0), 5);
 
@@ -174,17 +189,17 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     	hasSeenLines = true;
     	Vec4i rightMeanLine(0,0,0,0);
 	    Vec4i leftMeanLine(0,0,0,0);
-	    if(rightLines.size() > 0 && leftLines.size() > 0){
-	        for(auto line : rightLines){
-	            rightMeanLine = rightMeanLine + line;
-	        }
-	        rightMeanLine = rightMeanLine / (int)rightLines.size();
+	    
+        for(auto line : rightLines){
+            rightMeanLine = rightMeanLine + line;
+        }
+        rightMeanLine = rightMeanLine / (int)rightLines.size();
 
-	        for(auto line : leftLines){
-	            leftMeanLine = leftMeanLine + line;
-	        }
-	        leftMeanLine = leftMeanLine / (int)leftLines.size();
-	    }
+        for(auto line : leftLines){
+            leftMeanLine = leftMeanLine + line;
+        }
+        leftMeanLine = leftMeanLine / (int)leftLines.size();
+	    
 
 	    cv::line(srcImage, cv::Point(rightMeanLine[0], rightMeanLine[1]), cv::Point(rightMeanLine[2], rightMeanLine[3]), cv::Scalar(255, 0, 0), 5);
 	    cv::line(srcImage, cv::Point(leftMeanLine[0], leftMeanLine[1]), cv::Point(leftMeanLine[2], leftMeanLine[3]), cv::Scalar(255, 0, 0), 5);
@@ -211,44 +226,54 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 		}
 		last3Lines.push_back(middle);
 
-		angle = calcAngleBetweenVectors(vertical, middle);
+		//angle = calcAngleBetweenVectors(vertical, middle);
 
+		//std::cout << "Angle while lines are seen" << std::endl;
+		auto scalar = vertical.dot(middle);
+		float norm = cv::norm(middle);
+
+		angle = acos(scalar/(norm)) * (180/M_PI);
 
 		/*
 		* Calculate the accel param, which will be between 0 and 1. For small angles it will tend to 1, for bigger angles, it will tend to 0
 		* This way, the acceleration is limited by the current position in the field
 		*/
-		auto accel = ( std::sin(((angle * M_PI) / max_angle)) + 1) / 2;
+		auto accel = ( std::sin(((angle * M_PI) / maxAngle)) + 1) / 2;
 
 
 
-		cout << "Acceleration: " << accel << endl;
+		//cout << "Acceleration: " << accel << endl;
 
 		geometry_msgs::Twist twistMsg;
 
+		Vec2d normedMiddle = middle / cv::norm(middle);
 
+		if(angle > maxAngle){
 
-		if(angle > 10){
+			twistMsg.linear.x = linearX * -0.5;
 
-			if(middle[0] < 0){
-				twistMsg.angular.z = 0.1 * accel;
+			if(normedMiddle[0] < 0){
+				twistMsg.angular.z =  angularZ;
+
+				cout << "Turn right..." << endl;
 			} 
 
-			else if(middle[0] > 0) {
-				twistMsg.angular.z = -0.1 * accel;
+			else if(normedMiddle[0] > 0) {
+				twistMsg.angular.z = -1 * angularZ;
+
+				cout << "Turn left..." << endl;
 			} 
-			cout << "Angle to big! I'll better turn around.." << endl;
 		}
 		else{
 
-			twistMsg.linear.x = accel * 0.3;
+			twistMsg.linear.x = accel * linearX;
 
-			if(middle[0] < 0){
-				twistMsg.angular.z = 0.25 * accel;
+			if(normedMiddle[0] < -0.1){
+				twistMsg.angular.z = angularZ * accel;
 			} 
 
-			else if(middle[0] > 0) {
-				twistMsg.angular.z = -0.25 * accel;
+			else if(normedMiddle[0] > 0.1) {
+				twistMsg.angular.z = -1 * angularZ * accel;
 			} 
 			else {
 				twistMsg.angular.z = 0;
@@ -268,7 +293,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     		Vec2d averageVec(0,0);
 
 
-    		for(Vec2d vec : last3Lines){
+    		/*for(Vec2d vec : last3Lines){
     			angleCurrentlyNoLineSeen += calcAngleBetweenVectors(vec, Vec2d(0, -1));
     			averageVec +=  vec;
     		}
@@ -278,30 +303,30 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     		divide(last3Lines.size(), averageVec, averageVec);
     		//averageVec /= last3Lines.size();
 
-    		float accel = (std::sin(((angleCurrentlyNoLineSeen * M_PI) / max_angle)) + 1) / 2;
+    		float accel = (std::sin(((angleCurrentlyNoLineSeen * M_PI) / maxAngle)) + 1) / 2;
 
-    		twistMsg.linear.x = 0.3 * accel;
+    		twistMsg.linear.x = accel * linearX;
 
     		if(averageVec[0] < 0){
-				twistMsg.angular.z = 0.15 * accel;
+				twistMsg.angular.z = angularZ * accel;
 			} 
 
 			else if(averageVec[0] > 0) {
-				twistMsg.angular.z = -0.15 * accel;
+				twistMsg.angular.z = -1 * angularZ * accel;
 			} 
 			else {
 				twistMsg.angular.z = 0;
-			}
+			}*/
 
 
 
-    		twistMsg.linear.x = 0.3;
+    		twistMsg.linear.x = linearX;
 
     		pub.publish(twistMsg);
 
     	} else {
 
-    		twistMsg.angular.z = 0.15;
+    		twistMsg.angular.z = angularZouter;
 
     		pub.publish(twistMsg);
     	}
@@ -546,7 +571,16 @@ void infraCallback(const sensor_msgs::ImageConstPtr& msg){
 }
 
 
+void callback(reactive_navigation::navigationConfig &config, uint32_t level) {
+  	minLineLength = config.minLineLength;
+  	maxLineGap = config.maxLineGap;
+  	maxAngle = (float)config.maxAngle;
+  	linearX	= (float)config.linearX;
+  	angularZ = (float)config.angularZ;
+  	angularZouter = (float)config.angularZouter;
 
+  	cout << linearX << endl;
+}
 
 int main(int argc, char **argv)
 {  
@@ -557,6 +591,12 @@ int main(int argc, char **argv)
 
     image_transport::ImageTransport it(nh);
     image_transport::Subscriber sub = it.subscribe("camera/color/image_raw", 1, imageCallback);
+  	
+  	dynamic_reconfigure::Server<reactive_navigation::navigationConfig> server;
+  	dynamic_reconfigure::Server<reactive_navigation::navigationConfig>::CallbackType f;
+
+    f = boost::bind(&callback, _1, _2);
+  	server.setCallback(f);
     //image_transport::Subscriber sub2 = it.subscribe("camera/infra1/image_rect_raw", 1, infraCallback);
     //image_transport::Subscriber sub3 = it.subscribe("camera/aligned_depth_to_color/image_raw", 1, depthCallback);
 	//ros::Subscriber sub4 = nh.subscribe("camera/color/camera_info", 1, infoCallback);
