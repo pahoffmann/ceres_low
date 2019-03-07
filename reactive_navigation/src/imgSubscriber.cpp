@@ -10,8 +10,8 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include <pcl/point_types.h>
-#include <pcl_conversions/pcl_conversions.h>
+//#include <pcl/point_types.h>
+//#include <pcl_conversions/pcl_conversions.h>
 
 #include <boost/array.hpp>
 
@@ -22,7 +22,7 @@
 
 using namespace std;
 using namespace cv;
-using namespace pcl;
+//using namespace pcl;
 
 
 
@@ -316,7 +316,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 }
 
 
-
+/*
 PointCloud<PointXYZRGB>::Ptr CreatePointCloud(Mat depth_image, Mat color_image, vector<float> K){
 
 
@@ -347,6 +347,7 @@ PointCloud<PointXYZRGB>::Ptr CreatePointCloud(Mat depth_image, Mat color_image, 
 }
 
 
+
 void infoCallback(const sensor_msgs::CameraInfo &camera_info){
 
 	Mat undistortedSplit;
@@ -363,12 +364,14 @@ void infoCallback(const sensor_msgs::CameraInfo &camera_info){
 		//undistort(splitImage, undistortedSplit, kValues, dValues);
 		//undistort(depthImage, undistortedDepth, kValues, dValues);
 
+
 		auto pointcloud = CreatePointCloud(depthImage, splitImage, kValues);
 		sensor_msgs::PointCloud2 out;
 		pcl::toROSMsg(*pointcloud, out);
 		out.header.frame_id = "camera_link";
+		pointcloud_publisher.publish(out);
 
-		//pointcloud_publisher.publish(out);
+
 
 	}
 
@@ -381,7 +384,7 @@ void depthCallback(const sensor_msgs::ImageConstPtr& msg){
 	depthImage = cv_bridge::toCvShare(msg, "16UC1")->image;
 
 }
-
+*/
 
 
 
