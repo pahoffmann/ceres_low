@@ -58,7 +58,8 @@ std::deque<Vec2d> last3Lines; //we need to pop front
  *
  */
 
-float calcAngleBetweenVectors(Vec2d v1, Vec2d v2){
+float calcAngleBetweenVectors(Vec2d v1, Vec2d v2)
+{
 	auto scalar = v1.dot(v2);
 	float norm1 = cv::norm(v1);
 	float norm2 = cv::norm(v2);
@@ -67,7 +68,8 @@ float calcAngleBetweenVectors(Vec2d v1, Vec2d v2){
 }
 
 
-void disableEmitter(){
+void disableEmitter()
+{
 
 	dynamic_reconfigure::ReconfigureRequest srv_req;
 	dynamic_reconfigure::ReconfigureResponse srv_resp;
@@ -160,7 +162,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
         cv::Vec2d baseVec(1, 0);
         cv::Vec2d result = v2 - v1;
 
-        if(result[1] > 0) {
+        if(result[1] > 0)
+        {
             result = result * -1;
         }
 
@@ -172,7 +175,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
         double angle = std::acos(dotP / cv::norm(result)) * (180/3.141592);
 
-        if(angle > 90){
+        if(angle > 90)
+        {
             angle = 180 - angle;
         }
 
@@ -180,28 +184,35 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
         {
             //cv::line(srcImage, cv::Point(lines[i][0], lines[i][1]), cv::Point(lines[i][2], lines[i][3]), cv::Scalar(0, 255, 0), 5);
 
-            if(result[0] > 0){
+            if(result[0] > 0)
+            {
                 leftLines.push_back(line);
             }
-            else{
+            else
+            {
                 rightLines.push_back(line);
             }
         }      
     }
 
-    if(leftLines.size() > 0 && rightLines.size() > 0){
+    if(leftLines.size() > 0 && rightLines.size() > 0)
+    {
     	hasSeenLines = true;
     	Vec4i rightMeanLine(0,0,0,0);
 	    Vec4i leftMeanLine(0,0,0,0);
 	    
-        for(auto line : rightLines){
+        for(auto line : rightLines)
+        {
             rightMeanLine = rightMeanLine + line;
         }
+
         rightMeanLine = rightMeanLine / (int)rightLines.size();
 
-        for(auto line : leftLines){
+        for(auto line : leftLines)
+        {
             leftMeanLine = leftMeanLine + line;
         }
+
         leftMeanLine = leftMeanLine / (int)leftLines.size();
 	    
 
@@ -225,9 +236,11 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 		Vec2d middle = centerUp - Vec2d(320,480);
 
 		//save center line
-		if(last3Lines.size() == 3){
+		if(last3Lines.size() == 3)
+		{
 			last3Lines.pop_front();
 		}
+
 		last3Lines.push_back(middle);
 
 		//angle = calcAngleBetweenVectors(vertical, middle);
@@ -244,51 +257,53 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 		*/
 		auto accel = ( std::sin(((angle * M_PI) / maxAngle)) + 1) / 2;
 
-
-
 		//cout << "Acceleration: " << accel << endl;
 
 		geometry_msgs::Twist twistMsg;
 
 		Vec2d normedMiddle = middle / cv::norm(middle);
 
-		if(angle > maxAngle){
-
+		if(angle > maxAngle)
+		{
 			twistMsg.linear.x = linearX * -0.5;
 
-			if(normedMiddle[0] < 0){
+			if(normedMiddle[0] < 0)
+			{
 				twistMsg.angular.z =  angularZ;
-
 				cout << "Turn right..." << endl;
 			} 
 
-			else if(normedMiddle[0] > 0) {
+			else if(normedMiddle[0] > 0)
+			{
 				twistMsg.angular.z = -1 * angularZ;
-
 				cout << "Turn left..." << endl;
 			} 
 		}
-		else{
-
+		else
+		{
 			twistMsg.linear.x = accel * linearX;
 
-			if(normedMiddle[0] < -0.1){
+			if(normedMiddle[0] < -0.1)
+			{
 				twistMsg.angular.z = angularZ * accel;
-			} 
+			}
 
 			else if(normedMiddle[0] > 0.1) {
 				twistMsg.angular.z = -1 * angularZ * accel;
-			} 
-			else {
+			}
+
+			else
+			{
 				twistMsg.angular.z = 0;
 			}
 		}
 
 		pub.publish(twistMsg);
+    }
 
-    } else{
-    	//no line seen :( 
-
+    else
+    {
+    	//no line seen
     	geometry_msgs::Twist twistMsg;
 
     	if(hasSeenLines)
@@ -310,10 +325,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 			else
 			{
-
 	    		float angleCurrentlyNoLineSeen;
 	    		Vec2d averageVec(0,0);
-
 
 	    		/*for(Vec2d vec : last3Lines){
 	    			angleCurrentlyNoLineSeen += calcAngleBetweenVectors(vec, Vec2d(0, -1));
@@ -340,13 +353,10 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 					twistMsg.angular.z = 0;
 				}*/
 
-
-
 	    		twistMsg.linear.x = linearX;
-
-	    		pub.publish(twistMsg);
 			}
-    		
+
+    		pub.publish(twistMsg);
 
 
     	} 
@@ -359,8 +369,10 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     	
     }
 
-	//angle calculation done
+	sensor_msgs::ImagePtr msgImage = cv_bridge::CvImage(std_msgs::Header(), "bgr8", srcImage).toImageMsg();
+	pubImg.publish(msgImgage);
 
+	//angle calculation done
 	waitKey(30);
 
 
@@ -368,7 +380,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 
 /*
-PointCloud<PointXYZRGB>::Ptr CreatePointCloud(Mat depth_image, Mat color_image, vector<float> K){
+PointCloud<PointXYZRGB>::Ptr CreatePointCloud(Mat depth_image, Mat color_image, vector<float> K)
+{
 
 
 	PointCloud<PointXYZRGB>::Ptr pointcloud(new PointCloud<PointXYZRGB>);
@@ -383,8 +396,10 @@ PointCloud<PointXYZRGB>::Ptr CreatePointCloud(Mat depth_image, Mat color_image, 
 
     //cout << cx << " | " << cy << " | " << fx << " | " << fy << endl;
 
-    for (int v = 0; v < depth_image.rows; v++){
-    	for (int u = 0; u < depth_image.cols; u++){
+    for (int v = 0; v < depth_image.rows; v++)
+    {
+    	for (int u = 0; u < depth_image.cols; u++)
+    	{
     		float depth_value = depth_image.at<float>(v, u);
 
     		PointXYZRGB p;
@@ -399,7 +414,8 @@ PointCloud<PointXYZRGB>::Ptr CreatePointCloud(Mat depth_image, Mat color_image, 
 
 
 
-void infoCallback(const sensor_msgs::CameraInfo &camera_info){
+void infoCallback(const sensor_msgs::CameraInfo &camera_info)
+{
 
 	Mat undistortedSplit;
 	Mat undistortedDepth;
@@ -415,15 +431,11 @@ void infoCallback(const sensor_msgs::CameraInfo &camera_info){
 		//undistort(splitImage, undistortedSplit, kValues, dValues);
 		//undistort(depthImage, undistortedDepth, kValues, dValues);
 
-
 		auto pointcloud = CreatePointCloud(depthImage, splitImage, kValues);
 		sensor_msgs::PointCloud2 out;
 		pcl::toROSMsg(*pointcloud, out);
 		out.header.frame_id = "camera_link";
 		pointcloud_publisher.publish(out);
-
-
-
 	}
 
 
@@ -627,6 +639,7 @@ int main(int argc, char **argv)
     //image_transport::Subscriber sub3 = it.subscribe("camera/aligned_depth_to_color/image_raw", 1, depthCallback);
 	//ros::Subscriber sub4 = nh.subscribe("camera/color/camera_info", 1, infoCallback);
 	pub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
+	image_transport::Publisher pubImg = it.advertise("camera/lineImage", 1);
     
     ros::spin();
 
