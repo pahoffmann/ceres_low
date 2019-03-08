@@ -206,9 +206,6 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     	time_span_from_start_to_last_line_encounter = duration_cast<duration<double>>(steady_clock::now() - t1);
     	t1 = steady_clock::now();
 
-    	cout << leftLines.size() << endl;
-    	cout << rightLines.size() << endl;
-
     	hasSeenLines = true;
     	Vec4i rightMeanLine(0,0,0,0);
 	    Vec4i leftMeanLine(0,0,0,0);
@@ -320,7 +317,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     	if(hasSeenLines && time_span_from_start_to_last_line_encounter.count() > 1)
     	{
-/*
+    		cout << "Oh no! the Robot lost it's lines. Help him find them!" << endl;
+/*			 
     		if(rightLines.size() > 0) // only right line
     		{
 				twistMsg.angular.z = -1.5 * angularZ;
@@ -627,8 +625,6 @@ void callback(reactive_navigation::navigationConfig &config, uint32_t level) {
   	angularZouter = (float)config.angularZouter;
   	minLineAngle = config.minLineAngle;
   	maxLineAngle = config.maxLineAngle;
-
-  	cout << linearX << endl;
 }
 
 int main(int argc, char **argv)
