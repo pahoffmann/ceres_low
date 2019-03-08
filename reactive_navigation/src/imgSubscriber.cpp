@@ -324,7 +324,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     		time_span_since_last_line_encounter = duration<double>(steady_clock::now() - t1);
     	}
 
-    	if(hasSeenLines && time_span_since_last_line_encounter.count() > 0.5 && time_span_since_last_line_encounter < 8)
+    	if(hasSeenLines && time_span_since_last_line_encounter.count() > 0.5 && time_span_since_last_line_encounter.count() < 8)
     	{
     		//cout << "Oh no! the Robot lost it's lines. Help him find them!" << endl;
 /*			 
