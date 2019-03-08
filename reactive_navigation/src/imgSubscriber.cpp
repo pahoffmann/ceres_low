@@ -206,6 +206,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     	time_span_from_start_to_last_line_encounter = duration_cast<duration<double>>(steady_clock::now() - t1);
     	t1 = steady_clock::now();
 
+    	cout << "Found 2 lines" << time_span_from_start_to_last_line_encounter.count() << endl;
+
     	hasSeenLines = true;
     	Vec4i rightMeanLine(0,0,0,0);
 	    Vec4i leftMeanLine(0,0,0,0);
@@ -315,6 +317,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     	//no line seen
     	geometry_msgs::Twist twistMsg;
 
+    	cout << "No 2 Lines" << endl;
+
     	if(hasSeenLines && time_span_from_start_to_last_line_encounter.count() > 1)
     	{
     		cout << "Oh no! the Robot lost it's lines. Help him find them!" << endl;
@@ -371,6 +375,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     	else if(time_span_from_start_to_last_line_encounter.count() == 0)
     	{
+    		cout << "No Timespan, no lines" << endl;
+
     		twistMsg.angular.z = angularZouter;
     		pub.publish(twistMsg);
     	}
