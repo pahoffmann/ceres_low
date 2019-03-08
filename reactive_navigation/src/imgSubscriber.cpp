@@ -248,7 +248,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 		Vec2d middle = centerUp - Vec2d(320,480);
 
 		//save center line
-		if(last3Lines.size() == 3)
+		if(last3Lines.size() == 100)
 		{
 			last3Lines.pop_front();
 		}
