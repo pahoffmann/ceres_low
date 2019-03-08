@@ -324,7 +324,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     		time_span_since_last_line_encounter = duration<double>(steady_clock::now() - t1);
     	}
 
-    	if(hasSeenLines && time_span_since_last_line_encounter.count() > 3)
+    	if(hasSeenLines && time_span_since_last_line_encounter.count() > 0.5)
     	{
     		//cout << "Oh no! the Robot lost it's lines. Help him find them!" << endl;
 /*			 
@@ -366,11 +366,11 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 	    		twistMsg.linear.x = accel * linearX;
 
 	    		if(averageVec[0] < 0){
-					twistMsg.angular.z = angularZ * accel;
+					twistMsg.angular.z = 0.02 * accel;
 				} 
 
 				else if(averageVec[0] > 0) {
-					twistMsg.angular.z = -1 * angularZ * accel;
+					twistMsg.angular.z = -1 * 0.02 * accel;
 				} 
 				else {
 					twistMsg.angular.z = 0;
