@@ -29,34 +29,33 @@ using namespace cv;
 //using namespace pcl;
 
 
-
-
-
 Mat srcImage;
 Mat irImage;
 Mat depthImage;
 Mat splitImage;
+
 ros::Publisher pub;
 image_transport::Publisher pubImg;
 
-int minLineLength;// = 175;
-int maxLineGap;// = 50;
+int minLineLength;
+int maxLineGap;
 
-float maxAngle;// = 10;
-float linearX = 0;// = 0.2;
-float angularZ;// = 0.2;
+float maxAngle;
+float linearX = 0; //ensure that the robot doesn't go wild on startup
+float angularZ;
 float angularZouter;
-
+int minLineAngle;
+int maxLineAngle;
 
 bool hasSeenLines = false;
-
 
 std::deque<Vec2d> last3Lines; //we need to pop front
 
 
 /*
- * 
- *
+ * Calculates the angle between to vectors via cos(alpha) = (vec1 x vec2) / (|a|*|b|)
+ * @param vec1
+ * @param vec2
  */
 
 float calcAngleBetweenVectors(Vec2d v1, Vec2d v2)
@@ -181,7 +180,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
             angle = 180 - angle;
         }
 
-        if(angle > 20 && angle < 40)
+        if(angle > minLineAngle && angle < maxLineAngle)
         {
             //cv::line(srcImage, cv::Point(lines[i][0], lines[i][1]), cv::Point(lines[i][2], lines[i][3]), cv::Scalar(0, 255, 0), 5);
 
@@ -198,6 +197,9 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     if(leftLines.size() > 0 && rightLines.size() > 0)
     {
+    	cout << leftLines.size() << endl;
+    	cout << rightLines.size() << endl;
+
     	hasSeenLines = true;
     	Vec4i rightMeanLine(0,0,0,0);
 	    Vec4i leftMeanLine(0,0,0,0);
@@ -309,27 +311,27 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     	if(hasSeenLines)
     	{
-
+/*
     		if(rightLines.size() > 0) // only right line
     		{
-				twistMsg.angular.z = -2.5 * angularZ;
+				twistMsg.angular.z = -1.5 * angularZ;
 	    		twistMsg.linear.x = linearX;
 				cout << "Turn left. Tokyo Drift." << endl;
     		} 
 
     		else if(leftLines.size() > 0) // only left line
 			{
-				twistMsg.angular.z =  2.5 * angularZ;
+				twistMsg.angular.z =  1.5 * angularZ;
 				twistMsg.linear.x = linearX;
 				cout << "Turn right. Tokyo Drift." << endl;
 			}
 
 			else
-			{
+			{*/
 	    		float angleCurrentlyNoLineSeen;
 	    		Vec2d averageVec(0,0);
 
-	    		/*for(Vec2d vec : last3Lines){
+	    		for(Vec2d vec : last3Lines){
 	    			angleCurrentlyNoLineSeen += calcAngleBetweenVectors(vec, Vec2d(0, -1));
 	    			averageVec +=  vec;
 	    		}
@@ -352,10 +354,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 				} 
 				else {
 					twistMsg.angular.z = 0;
-				}*/
-
-	    		twistMsg.linear.x = linearX;
-			}
+				}
+			//}
 
     		pub.publish(twistMsg);
 
@@ -375,7 +375,6 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 	//angle calculation done
 	waitKey(30);
-
 
 }
 
@@ -617,6 +616,8 @@ void callback(reactive_navigation::navigationConfig &config, uint32_t level) {
   	linearX	= (float)config.linearX;
   	angularZ = (float)config.angularZ;
   	angularZouter = (float)config.angularZouter;
+  	minLineAngle = config.minLineAngle;
+  	maxLineAngle = config.maxLineAngle;
 
   	cout << linearX << endl;
 }
