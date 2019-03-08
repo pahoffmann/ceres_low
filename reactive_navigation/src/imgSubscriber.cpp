@@ -40,7 +40,8 @@ ros::Publisher pub;
 image_transport::Publisher pubImg;
 
 steady_clock::time_point t1;
-duration<double> time_span_from_start_to_last_line_encounter = duration<double>::zero();
+bool clockStarted = false;
+duration<double> time_span_since_last_line_encounter = duration<double>::zero();
 
 int minLineLength;
 int maxLineGap;
@@ -203,10 +204,10 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     if(leftLines.size() > 0 && rightLines.size() > 0)
     {
 
-    	time_span_from_start_to_last_line_encounter = duration_cast<duration<double>>(steady_clock::now() - t1);
     	t1 = steady_clock::now();
+    	clockStarted = true;
 
-    	cout << "Found 2 lines" << time_span_from_start_to_last_line_encounter.count() << endl;
+    	cout << "Found 2 lines" << time_span_since_last_line_encounter.count() << endl;
 
     	hasSeenLines = true;
     	Vec4i rightMeanLine(0,0,0,0);
@@ -317,9 +318,13 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     	//no line seen
     	geometry_msgs::Twist twistMsg;
 
-    	cout << "No 2 Lines" << endl;
+    	cout << "No 2 Lines" << time_span_since_last_line_encounter.count() << endl;
 
-    	if(hasSeenLines && time_span_from_start_to_last_line_encounter.count() > 1)
+    	if(clockStarted){
+    		time_span_since_last_line_encounter = duration<double>(steady_clock::now() - t1);
+    	}
+
+    	if(hasSeenLines && time_span_since_last_line_encounter.count() > 1)
     	{
     		cout << "Oh no! the Robot lost it's lines. Help him find them!" << endl;
 /*			 
@@ -373,7 +378,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     	} 
 
-    	else if(time_span_from_start_to_last_line_encounter.count() == 0)
+    	else if(!clockStarted)
     	{
     		cout << "No Timespan, no lines" << endl;
 
@@ -655,7 +660,7 @@ int main(int argc, char **argv)
 	pub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
 	pubImg = it.advertise("camera/lineImage", 1);
     
-	t1 = steady_clock::now();
+	//t1 = steady_clock::now();
 
     ros::spin();
 
