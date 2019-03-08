@@ -207,7 +207,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     	t1 = steady_clock::now();
     	clockStarted = true;
 
-    	cout << "Found 2 lines" << time_span_since_last_line_encounter.count() << endl;
+    	//cout << "Found 2 lines" << time_span_since_last_line_encounter.count() << endl;
 
     	hasSeenLines = true;
     	Vec4i rightMeanLine(0,0,0,0);
@@ -282,13 +282,13 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 			if(normedMiddle[0] < 0)
 			{
 				twistMsg.angular.z =  angularZ;
-				cout << "Turn right..." << endl;
+				//cout << "Turn right..." << endl;
 			} 
 
 			else if(normedMiddle[0] > 0)
 			{
 				twistMsg.angular.z = -1 * angularZ;
-				cout << "Turn left..." << endl;
+				//cout << "Turn left..." << endl;
 			} 
 		}
 		else
@@ -318,7 +318,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     	//no line seen
     	geometry_msgs::Twist twistMsg;
 
-    	cout << "No 2 Lines" << time_span_since_last_line_encounter.count() << endl;
+    	//cout << "No 2 Lines" << time_span_since_last_line_encounter.count() << endl;
 
     	if(clockStarted){
     		time_span_since_last_line_encounter = duration<double>(steady_clock::now() - t1);
@@ -326,7 +326,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     	if(hasSeenLines && time_span_since_last_line_encounter.count() > 1)
     	{
-    		cout << "Oh no! the Robot lost it's lines. Help him find them!" << endl;
+    		//cout << "Oh no! the Robot lost it's lines. Help him find them!" << endl;
 /*			 
     		if(rightLines.size() > 0) // only right line
     		{
@@ -380,7 +380,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     	else if(!clockStarted && !hasSeenLines)
     	{
-    		cout << "No Timespan, no lines" << endl;
+    		//cout << "No Timespan, no lines" << endl;
 
     		twistMsg.angular.z = angularZouter;
     		pub.publish(twistMsg);
@@ -388,8 +388,8 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     	
     }
 
-	sensor_msgs::ImagePtr msgImage = cv_bridge::CvImage(std_msgs::Header(), "bgr8", srcImage).toImageMsg();
-	pubImg.publish(msgImage);
+	//sensor_msgs::ImagePtr msgImage = cv_bridge::CvImage(std_msgs::Header(), "bgr8", srcImage).toImageMsg();
+	//pubImg.publish(msgImage);
 
 	//angle calculation done
 	waitKey(30);
