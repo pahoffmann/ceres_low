@@ -53,6 +53,10 @@ bool hasSeenLines = false;
 std::deque<Vec2d> last3Lines; //we need to pop front
 
 
+/*
+ * 
+ *
+ */
 
 float calcAngleBetweenVectors(Vec2d v1, Vec2d v2){
 	auto scalar = v1.dot(v2);
@@ -287,47 +291,69 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     	geometry_msgs::Twist twistMsg;
 
-    	if(hasSeenLines){
+    	if(hasSeenLines)
+    	{
 
-    		float angleCurrentlyNoLineSeen;
-    		Vec2d averageVec(0,0);
+    		if(rightLines.size() > 0) // only right line
+    		{
+				twistMsg.angular.z = -2.5 * angularZ;
+	    		twistMsg.linear.x = linearX;
+				cout << "Turn left. Tokyo Drift." << endl;
+    		} 
 
+    		else if(leftLines.size() > 0) // only left line
+			{
+				twistMsg.angular.z =  2.5 * angularZ;
+				twistMsg.linear.x = linearX;
+				cout << "Turn right. Tokyo Drift." << endl;
+			}
 
-    		/*for(Vec2d vec : last3Lines){
-    			angleCurrentlyNoLineSeen += calcAngleBetweenVectors(vec, Vec2d(0, -1));
-    			averageVec +=  vec;
-    		}
+			else
+			{
 
-    		angleCurrentlyNoLineSeen /=  last3Lines.size();
-
-    		divide(last3Lines.size(), averageVec, averageVec);
-    		//averageVec /= last3Lines.size();
-
-    		float accel = (std::sin(((angleCurrentlyNoLineSeen * M_PI) / maxAngle)) + 1) / 2;
-
-    		twistMsg.linear.x = accel * linearX;
-
-    		if(averageVec[0] < 0){
-				twistMsg.angular.z = angularZ * accel;
-			} 
-
-			else if(averageVec[0] > 0) {
-				twistMsg.angular.z = -1 * angularZ * accel;
-			} 
-			else {
-				twistMsg.angular.z = 0;
-			}*/
+	    		float angleCurrentlyNoLineSeen;
+	    		Vec2d averageVec(0,0);
 
 
+	    		/*for(Vec2d vec : last3Lines){
+	    			angleCurrentlyNoLineSeen += calcAngleBetweenVectors(vec, Vec2d(0, -1));
+	    			averageVec +=  vec;
+	    		}
 
-    		twistMsg.linear.x = linearX;
+	    		angleCurrentlyNoLineSeen /=  last3Lines.size();
 
-    		pub.publish(twistMsg);
+	    		divide(last3Lines.size(), averageVec, averageVec);
+	    		//averageVec /= last3Lines.size();
 
-    	} else {
+	    		float accel = (std::sin(((angleCurrentlyNoLineSeen * M_PI) / maxAngle)) + 1) / 2;
 
+	    		twistMsg.linear.x = accel * linearX;
+
+	    		if(averageVec[0] < 0){
+					twistMsg.angular.z = angularZ * accel;
+				} 
+
+				else if(averageVec[0] > 0) {
+					twistMsg.angular.z = -1 * angularZ * accel;
+				} 
+				else {
+					twistMsg.angular.z = 0;
+				}*/
+
+
+
+	    		twistMsg.linear.x = linearX;
+
+	    		pub.publish(twistMsg);
+			}
+    		
+
+
+    	} 
+
+    	else
+    	{
     		twistMsg.angular.z = angularZouter;
-
     		pub.publish(twistMsg);
     	}
     	
