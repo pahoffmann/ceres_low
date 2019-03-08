@@ -378,7 +378,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     	} 
 
-    	else if(!clockStarted)
+    	else if(!clockStarted && !hasSeenLines)
     	{
     		cout << "No Timespan, no lines" << endl;
 
