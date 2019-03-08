@@ -9,6 +9,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <cv_bridge/cv_bridge.h>
 
+#include <chrono>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -26,6 +27,7 @@
 
 using namespace std;
 using namespace cv;
+using namespace std::chrono;
 //using namespace pcl;
 
 
@@ -36,6 +38,9 @@ Mat splitImage;
 
 ros::Publisher pub;
 image_transport::Publisher pubImg;
+
+steady_clock::time_point t1;
+duration<double> time_span_from_start_to_last_line_encounter = duration<double>::zero();
 
 int minLineLength;
 int maxLineGap;
@@ -197,6 +202,10 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     if(leftLines.size() > 0 && rightLines.size() > 0)
     {
+
+    	time_span_from_start_to_last_line_encounter = duration_cast<duration<double>>(steady_clock::now() - t1);
+    	t1 = steady_clock::now();
+
     	cout << leftLines.size() << endl;
     	cout << rightLines.size() << endl;
 
@@ -309,7 +318,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     	//no line seen
     	geometry_msgs::Twist twistMsg;
 
-    	if(hasSeenLines)
+    	if(hasSeenLines && time_span_from_start_to_last_line_encounter.count() > 1)
     	{
 /*
     		if(rightLines.size() > 0) // only right line
@@ -362,7 +371,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
     	} 
 
-    	else
+    	else if(time_span_from_start_to_last_line_encounter.count() == 0)
     	{
     		twistMsg.angular.z = angularZouter;
     		pub.publish(twistMsg);
@@ -625,6 +634,7 @@ void callback(reactive_navigation::navigationConfig &config, uint32_t level) {
 int main(int argc, char **argv)
 {  
 
+
     ros::init(argc, argv, "image_listener");
     ros::NodeHandle nh;
     disableEmitter();
@@ -643,6 +653,8 @@ int main(int argc, char **argv)
 	pub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
 	pubImg = it.advertise("camera/lineImage", 1);
     
+	t1 = steady_clock::now();
+
     ros::spin();
 
     return 0;
