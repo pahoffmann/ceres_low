@@ -344,36 +344,38 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 			else
 			{*/
-	    		float angleCurrentlyNoLineSeen;
+	    		float angleCurrentlyNoLineSeen = 0;
 	    		Vec2d averageVec(0,0);
 
-	    		/*for(Vec2d vec : last3Lines){
-	    			angleCurrentlyNoLineSeen += calcAngleBetweenVectors(vec, Vec2d(0, -1));
+	    		for(Vec2d vec : last3Lines){
 	    			averageVec +=  vec;
 	    		}
 
-	    		angleCurrentlyNoLineSeen /=  last3Lines.size();
+	    		Vec2d vertical(0,-1);
 
 	    		divide(last3Lines.size(), averageVec, averageVec);
-	    		//averageVec /= last3Lines.size();
+                //angleCurrentlyNoLineSeen = calcAngleBetweenVectors(averageVec, Vec2d(0, -1));
+
+                auto scalar = vertical.dot(averageVec);
+                float norm = cv::norm(averageVec);
+
+                angleCurrentlyNoLineSeen = acos(scalar/(norm)) * (180/M_PI);
 
 	    		float accel = (std::sin(((angleCurrentlyNoLineSeen * M_PI) / maxAngle)) + 1) / 2;
 
 	    		twistMsg.linear.x = accel * linearX;
 
 	    		if(averageVec[0] < 0){
-					twistMsg.angular.z = -1* angularZ * accel;
+					twistMsg.angular.z = angularZ * accel;
 				} 
 
 				else if(averageVec[0] > 0) {
-					twistMsg.angular.z =  angularZ * accel;
+					twistMsg.angular.z = -1 * angularZ * accel;
 				} 
 				else {
 					twistMsg.angular.z = 0;
-				}*/
+				}
 			//}
-
-			twistMsg.linear.x = linearX;
 
     		pub.publish(twistMsg);
 
