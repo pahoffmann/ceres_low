@@ -37,6 +37,7 @@ Mat irImage;
 Mat depthImage;
 Mat splitImage;
 ros::Publisher pub;
+image_transport::Publisher pubImg;
 
 int minLineLength;// = 175;
 int maxLineGap;// = 50;
@@ -370,7 +371,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
     }
 
 	sensor_msgs::ImagePtr msgImage = cv_bridge::CvImage(std_msgs::Header(), "bgr8", srcImage).toImageMsg();
-	pubImg.publish(msgImgage);
+	pubImg.publish(msgImage);
 
 	//angle calculation done
 	waitKey(30);
@@ -639,7 +640,7 @@ int main(int argc, char **argv)
     //image_transport::Subscriber sub3 = it.subscribe("camera/aligned_depth_to_color/image_raw", 1, depthCallback);
 	//ros::Subscriber sub4 = nh.subscribe("camera/color/camera_info", 1, infoCallback);
 	pub = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
-	image_transport::Publisher pubImg = it.advertise("camera/lineImage", 1);
+	pubImg = it.advertise("camera/lineImage", 1);
     
     ros::spin();
 
