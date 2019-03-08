@@ -347,7 +347,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 	    		float angleCurrentlyNoLineSeen;
 	    		Vec2d averageVec(0,0);
 
-	    		for(Vec2d vec : last3Lines){
+	    		/*for(Vec2d vec : last3Lines){
 	    			angleCurrentlyNoLineSeen += calcAngleBetweenVectors(vec, Vec2d(0, -1));
 	    			averageVec +=  vec;
 	    		}
@@ -370,8 +370,10 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 				} 
 				else {
 					twistMsg.angular.z = 0;
-				}
+				}*/
 			//}
+
+			twistMsg.linear.x = linearX;
 
     		pub.publish(twistMsg);
 
