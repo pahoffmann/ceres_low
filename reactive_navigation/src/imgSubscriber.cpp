@@ -362,11 +362,11 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 	    		twistMsg.linear.x = accel * linearX;
 
 	    		if(averageVec[0] < 0){
-					twistMsg.angular.z = angularZ * accel;
+					twistMsg.angular.z = -1* angularZ * accel;
 				} 
 
 				else if(averageVec[0] > 0) {
-					twistMsg.angular.z = -1 * angularZ * accel;
+					twistMsg.angular.z =  angularZ * accel;
 				} 
 				else {
 					twistMsg.angular.z = 0;
